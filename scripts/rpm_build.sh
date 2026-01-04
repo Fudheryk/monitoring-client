@@ -35,13 +35,13 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # -----------------------------------------------------------------------------
 function check_prerequisites() {
   echo "[check] Vérification des prérequis..."
-
+  
   # Vérifier systemctl
   if ! command -v systemctl &> /dev/null; then
     echo "❌ systemd n'est pas installé. L'installation ne peut pas continuer."
     exit 1
   fi
-
+  
   # Vérifier rpmbuild
   if ! command -v rpmbuild &> /dev/null; then
     echo "❌ rpmbuild n'est pas installé."
@@ -49,9 +49,9 @@ function check_prerequisites() {
     echo "                  ou : sudo dnf install rpm-build"
     exit 1
   fi
-
+  
   echo "[check] ✓ rpmbuild détecté"
-
+  
   # Vérifier la version de systemd (minimum 226)
   SYSTEMD_VERSION=$(systemctl --version | head -n 1 | awk '{print $2}')
   if [[ "${SYSTEMD_VERSION}" -lt 226 ]]; then
@@ -60,9 +60,9 @@ function check_prerequisites() {
     echo "   Veuillez mettre à jour systemd."
     exit 1
   fi
-
+  
   echo "[check] ✓ systemd version ${SYSTEMD_VERSION} détecté"
-
+  
   # Vérifier Python 3 (pour le build PyInstaller)
   if ! command -v python3 &> /dev/null; then
     echo "❌ Python 3 n'est pas installé. Impossible de builder le binaire."
@@ -70,9 +70,9 @@ function check_prerequisites() {
     echo "                  ou : sudo dnf install python3"
     exit 1
   fi
-
+  
   echo "[check] ✓ Python 3 détecté : $(python3 --version)"
-
+  
   # Vérifier PyInstaller
   if ! python3 -m pip show pyinstaller &> /dev/null; then
     echo "⚠️  PyInstaller n'est pas installé. Tentative d'installation..."
@@ -82,15 +82,15 @@ function check_prerequisites() {
       exit 1
     }
   fi
-
+  
   echo "[check] ✓ PyInstaller détecté"
-
+  
   # Vérifier tar (nécessaire pour créer Source0)
   if ! command -v tar &> /dev/null; then
     echo "❌ tar n'est pas installé."
     exit 1
   fi
-
+  
   echo "[check] ✓ tar détecté"
   echo "[check] ✓ Tous les prérequis sont satisfaits"
 }
@@ -245,6 +245,9 @@ echo "[rpm] ✓ Configuration préparée"
 # -----------------------------------------------------------------------------
 echo "[rpm] Génération du fichier SPEC..."
 
+# ✅ CORRECTION 1 : Générer la date en anglais pour le changelog
+CHANGELOG_DATE=$(LC_TIME=C date '+%a %b %d %Y')
+
 cat > "${RPMROOT}/SPECS/monitoring-client.spec" <<EOF
 Name:           monitoring-client
 Version:        ${VERSION}
@@ -288,8 +291,10 @@ chmod 755 %{buildroot}/usr/local/bin/monitoring-client
 mkdir -p %{buildroot}/etc/monitoring-client
 install -m 644 ${PROJECT_ROOT}/config/config.yaml.example %{buildroot}/etc/monitoring-client/config.yaml
 
-# Répertoires de données et logs
-mkdir -p %{buildroot}/opt/monitoring-client/{data,vendors}
+# ✅ CORRECTION 2 : Créer les répertoires séparément (pas d'accolades)
+mkdir -p %{buildroot}/opt/monitoring-client
+mkdir -p %{buildroot}/opt/monitoring-client/data
+mkdir -p %{buildroot}/opt/monitoring-client/vendors
 mkdir -p %{buildroot}/var/log/monitoring-client
 mkdir -p %{buildroot}/var/cache/monitoring-client
 
@@ -320,14 +325,16 @@ log "=== Configuration de Monitoring Client ==="
 log ""
 
 # Créer les répertoires nécessaires (si pas déjà présents)
-mkdir -p /opt/monitoring-client/{data,vendors}
+mkdir -p /opt/monitoring-client/data
+mkdir -p /opt/monitoring-client/vendors
 mkdir -p /var/log/monitoring-client
 mkdir -p /var/cache/monitoring-client
 
 # Permissions strictes
 chmod 755 /usr/local/bin/monitoring-client
 chmod 644 /etc/monitoring-client/config.yaml
-chmod 755 /opt/monitoring-client/{data,vendors}
+chmod 755 /opt/monitoring-client/data
+chmod 755 /opt/monitoring-client/vendors
 chmod 755 /var/log/monitoring-client
 chmod 755 /var/cache/monitoring-client
 
@@ -350,11 +357,11 @@ if [[ -f /etc/monitoring-client/api_key && -s /etc/monitoring-client/api_key ]];
   # Sécuriser la clé API
   chmod 600 /etc/monitoring-client/api_key
   log "✓ Clé API détectée et sécurisée (chmod 600)"
-
+  
   # Vérifier si c'est une mise à jour
   if rpm -q monitoring-client >/dev/null 2>&1; then
     log "✓ Mise à jour détectée"
-
+    
     # Redémarrer le timer si déjà actif
     if systemctl is-active --quiet monitoring-client.timer 2>/dev/null; then
       systemctl restart monitoring-client.timer || true
@@ -420,19 +427,19 @@ log "━━━━━━━━━━━━━━━━━━━━━━━━━
 
 if [[ "\$1" -eq 0 ]]; then
   log "Action détectée : suppression complète"
-
+  
   # Arrêter le timer
   if systemctl is-active --quiet monitoring-client.timer 2>/dev/null; then
     systemctl stop monitoring-client.timer || true
     log "✓ Timer arrêté"
   fi
-
+  
   # Désactiver le timer
   if systemctl is-enabled --quiet monitoring-client.timer 2>/dev/null; then
     systemctl disable monitoring-client.timer || true
     log "✓ Timer désactivé"
   fi
-
+  
   # Arrêter le service s'il tourne
   if systemctl is-active --quiet monitoring-client.service 2>/dev/null; then
     systemctl stop monitoring-client.service || true
@@ -440,7 +447,7 @@ if [[ "\$1" -eq 0 ]]; then
   fi
 else
   log "Action détectée : mise à jour (conservation du timer)"
-
+  
   # En mise à jour, on arrête juste le timer temporairement
   if systemctl is-active --quiet monitoring-client.timer 2>/dev/null; then
     systemctl stop monitoring-client.timer || true
@@ -464,26 +471,26 @@ if [[ "\$1" -eq 0 ]]; then
   log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   log "Nettoyage post-suppression"
   log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
+  
   # Suppression complète des fichiers et répertoires
   rm -rf /opt/monitoring-client/data
   rm -rf /opt/monitoring-client/vendors
   rm -rf /var/log/monitoring-client
   rm -rf /var/cache/monitoring-client
   rm -rf /etc/monitoring-client
-
+  
   # Si /opt/monitoring-client est vide, le supprimer aussi
   if [[ -d /opt/monitoring-client ]] && [[ -z "\$(ls -A /opt/monitoring-client)" ]]; then
     rmdir /opt/monitoring-client
     log "✓ Répertoire /opt/monitoring-client supprimé (vide)"
   fi
-
+  
   # Recharger systemd après suppression des fichiers
   if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload 2>/dev/null || true
     log "✓ systemd rechargé"
   fi
-
+  
   log ""
   log "✓ Monitoring Client désinstallé complètement"
   log ""
@@ -497,7 +504,7 @@ fi
 exit 0
 
 %changelog
-* $(date '+%a %b %d %Y') Frederic GIL GARCIA <frederic.gilgarcia@gmail.com> - ${VERSION}-1
+* ${CHANGELOG_DATE} Frederic GIL GARCIA <frederic.gilgarcia@gmail.com> - ${VERSION}-1
 - Version ${VERSION}
 - Build automatique avec amélioration de sécurité et logging
 
