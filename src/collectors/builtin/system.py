@@ -3,6 +3,11 @@ Collecteur système unifié.
 
 Combine les informations statiques et les métriques dynamiques
 pour éviter les doublons et simplifier la maintenance.
+
+CORRECTIFS APPLIQUÉS :
+- Filtrage des bind mounts systemd (ReadWritePaths)
+- Dédoublonnage par device (évite les métriques redondantes)
+- Détection robuste via /proc/self/mountinfo (fallback)
 """
 
 from __future__ import annotations
@@ -293,19 +298,86 @@ class SystemCollector(BaseCollector):
         except Exception as exc:
             logger.debug("Échec collecte process count: %s", exc)
 
-        # === MÉTRIQUES DISQUE ===
+        # === MÉTRIQUES DISQUE (avec filtrage bind mounts et dédoublonnage) ===
         try:
+            # Étape 1 : Filtrage de base des partitions
+            skip_fs_types = {
+                'squashfs', 'tmpfs', 'devtmpfs', 'overlay', 
+                'proc', 'sysfs', 'cgroup', 'cgroup2',
+                'devpts', 'securityfs', 'fusectl', 'debugfs'
+            }
+            skip_prefixes = ('/sys', '/proc', '/dev', '/run')
+            
+            valid_partitions = []
+            
             for partition in psutil.disk_partitions(all=False):
                 mountpoint = partition.mountpoint
                 
                 # Filtrer les systèmes de fichiers spéciaux
-                skip_fs_types = ['squashfs', 'tmpfs', 'devtmpfs', 'overlay', 'proc', 'sysfs', 'cgroup']
                 if partition.fstype in skip_fs_types:
                     continue
                 
                 # Éviter les points de montage spéciaux
-                if mountpoint.startswith(('/sys', '/proc', '/dev', '/run')):
+                if mountpoint.startswith(skip_prefixes):
                     continue
+                
+                # ✅ CORRECTIF 1 : Filtrer les bind mounts via partition.opts
+                # Détecte les bind mounts systemd (ReadWritePaths, ProtectSystem)
+                opts = set((partition.opts or "").split(","))
+                if "bind" in opts or "rbind" in opts:
+                    logger.debug("Ignoring bind mount: %s", mountpoint)
+                    continue
+                
+                # ✅ CORRECTIF 2 : Fallback robuste via /proc/self/mountinfo
+                # Plus fiable si partition.opts est vide ou incomplet
+                if self._is_bind_mount(mountpoint):
+                    logger.debug("Ignoring bind mount (via /proc): %s", mountpoint)
+                    continue
+                
+                valid_partitions.append(partition)
+            
+            # Étape 2 : Dédoublonnage par device
+            # Si plusieurs mountpoints pointent vers le même device (ex: / et /var),
+            # ne garder que le plus court (racine logique du filesystem)
+            seen_devices = {}
+            unique_partitions = []
+            
+            for partition in valid_partitions:
+                try:
+                    stat_info = os.stat(partition.mountpoint)
+                    device_id = stat_info.st_dev
+                    
+                    if device_id in seen_devices:
+                        # Device déjà vu : garder le mountpoint le plus court
+                        existing = seen_devices[device_id]
+                        if len(partition.mountpoint) < len(existing.mountpoint):
+                            # Remplacer par le plus court
+                            unique_partitions.remove(existing)
+                            seen_devices[device_id] = partition
+                            unique_partitions.append(partition)
+                            logger.debug(
+                                "Replacing %s with shorter %s (same device %s)",
+                                existing.mountpoint, partition.mountpoint, device_id
+                            )
+                        else:
+                            # Ignorer ce doublon (plus long)
+                            logger.debug(
+                                "Skipping duplicate mountpoint %s (device %s already seen as %s)",
+                                partition.mountpoint, device_id, existing.mountpoint
+                            )
+                    else:
+                        # Nouveau device
+                        seen_devices[device_id] = partition
+                        unique_partitions.append(partition)
+                
+                except (OSError, PermissionError) as exc:
+                    # Si stat() échoue, ignorer ce mountpoint
+                    logger.debug("Cannot stat %s: %s", partition.mountpoint, exc)
+                    continue
+            
+            # Étape 3 : Collecte des métriques pour les partitions uniques
+            for partition in unique_partitions:
+                mountpoint = partition.mountpoint
                 
                 try:
                     disk_usage = psutil.disk_usage(mountpoint)
@@ -314,26 +386,31 @@ class SystemCollector(BaseCollector):
                     metrics.extend([
                         {
                             "name": f"disk[{mountpoint}].usage_percent",
-                            "value": float(disk_usage.percent),
+                            "value": round(disk_usage.percent, 1),
                             "type": "numeric",
+                            "unit": "%",
                         },
                         {
                             "name": f"disk[{mountpoint}].total_gb",
                             "value": round(disk_usage.total / (1024**3), 2),
                             "type": "numeric",
+                            "unit": "GB",
                         },
                         {
                             "name": f"disk[{mountpoint}].free_gb",
                             "value": round(disk_usage.free / (1024**3), 2),
                             "type": "numeric",
+                            "unit": "GB",
                         }
                     ])
-                except (PermissionError, FileNotFoundError):
+                
+                except (PermissionError, FileNotFoundError) as exc:
                     # Partition non accessible
+                    logger.debug("Cannot access disk usage for %s: %s", mountpoint, exc)
                     continue
                 except Exception as exc:
                     logger.debug("Erreur sur la partition %s: %s", mountpoint, exc)
-                    
+
         except Exception as exc:
             logger.debug("Échec collecte disque: %s", exc)
 
@@ -350,9 +427,81 @@ class SystemCollector(BaseCollector):
                                     "name": f"temperature.{sensor_name}.current",
                                     "value": float(temp.current),
                                     "type": "numeric",
+                                    "unit": "°C",
                                 }
                             )
         except Exception as exc:
             logger.debug("Échec collecte températures: %s", exc)
 
         return metrics
+
+    @staticmethod
+    def _is_bind_mount(mountpoint: str) -> bool:
+        """
+        Détecte les bind mounts via /proc/self/mountinfo.
+        
+        Plus robuste que partition.opts sur Linux, car :
+        - partition.opts peut être vide selon le backend psutil
+        - /proc/self/mountinfo est la source de vérité du kernel
+        
+        Cette méthode détecte spécifiquement les bind mounts créés par systemd
+        via ReadWritePaths, ProtectSystem=strict, etc.
+        
+        Args:
+            mountpoint: Chemin du point de montage à vérifier
+        
+        Returns:
+            True si c'est un bind mount, False sinon
+        
+        Note:
+            Graceful fallback si /proc/self/mountinfo n'existe pas
+            (non-Linux, permissions restreintes, etc.)
+        """
+        try:
+            with open("/proc/self/mountinfo", "r", encoding="utf-8") as f:
+                for line in f:
+                    # Format /proc/self/mountinfo (man proc(5)) :
+                    # 36 35 98:0 /mnt1 /mnt2 rw,noatime master:1 - ext3 /dev/root rw,errors=continue
+                    # Champs : mount_id parent_id major:minor root mount_point options...
+                    parts = line.split()
+                    if len(parts) < 10:
+                        continue
+                    
+                    # Champ 4 = mount_point
+                    # Champ 3 = root (source dans le filesystem parent)
+                    current_mount_point = parts[4]
+                    root_source = parts[3]
+                    
+                    if current_mount_point == mountpoint:
+                        # Bind mount détecté si :
+                        # - root != "/" (pas la racine du filesystem)
+                        # - OU si "bind" apparaît dans les options (champ 5)
+                        
+                        # Méthode 1 : Vérifier root source
+                        if root_source != "/":
+                            # Si root pointe vers un sous-répertoire du FS parent,
+                            # c'est probablement un bind mount
+                            logger.debug(
+                                "Detected bind mount %s (root=%s)", 
+                                mountpoint, root_source
+                            )
+                            return True
+                        
+                        # Méthode 2 : Chercher "bind" dans les options (champ 6+)
+                        # Les options peuvent contenir "shared:N", "master:N", "bind", etc.
+                        options_str = " ".join(parts[5:])
+                        if "bind" in options_str.lower():
+                            logger.debug(
+                                "Detected bind mount %s (options=%s)", 
+                                mountpoint, options_str
+                            )
+                            return True
+        
+        except (FileNotFoundError, PermissionError) as exc:
+            # /proc/self/mountinfo indisponible (non-Linux ou permissions)
+            logger.debug("Cannot read /proc/self/mountinfo: %s", exc)
+        except Exception as exc:
+            # Autre erreur (parsing, encoding, etc.)
+            logger.debug("Error parsing /proc/self/mountinfo: %s", exc)
+        
+        return False
