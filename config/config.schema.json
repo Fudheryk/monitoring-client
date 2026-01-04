@@ -1,0 +1,132 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Monitoring Client Configuration",
+  "type": "object",
+  "required": ["client", "api", "paths", "machine", "fingerprint", "logging"],
+  "properties": {
+    "client": {
+      "type": "object",
+      "required": ["name", "version", "schema_version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "schema_version": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "api": {
+      "type": "object",
+      "required": [
+        "base_url",
+        "metrics_endpoint",
+        "timeout_seconds",
+        "max_retries",
+        "api_key_header",
+        "api_key_file"
+      ],
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "pattern": "^https?://.+"
+        },
+        "metrics_endpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_seconds": {
+          "type": "number",
+          "minimum": 0.1
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "api_key_header": {
+          "type": "string",
+          "minLength": 1
+        },
+        "api_key_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "api_key_env_var": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "paths": {
+      "type": "object",
+      "required": ["builtin_collectors_dir", "vendors_dir", "data_dir"],
+      "properties": {
+        "builtin_collectors_dir": { "type": "string", "minLength": 1 },
+        "vendors_dir": { "type": "string", "minLength": 1 },
+        "data_dir": { "type": "string", "minLength": 1 },
+        "logs_dir": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "machine": {
+      "type": "object",
+      "required": ["hostname_source"],
+      "properties": {
+        "hostname_source": {
+          "type": "string",
+          "enum": ["system", "fqdn", "static"]
+        },
+        "hostname_override": {
+          "type": ["string", "null"]
+        },
+        "os_override": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "fingerprint": {
+      "type": "object",
+      "required": ["method"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "salt": {
+          "type": ["string", "null"]
+        },
+        "force_recompute": {
+          "type": "boolean"
+        },
+        "cache_file": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "logging": {
+      "type": "object",
+      "required": ["level", "format", "console_enabled", "file_enabled"],
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
+        },
+        "format": {
+          "type": "string",
+          "enum": ["plain", "json"]
+        },
+        "console_enabled": {
+          "type": "boolean"
+        },
+        "file_enabled": {
+          "type": "boolean"
+        },
+        "file_name": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

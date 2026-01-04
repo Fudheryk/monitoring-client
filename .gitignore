@@ -1,0 +1,99 @@
+# --------------------------------------------
+# .gitignore - Ignorer les fichiers indésirables
+# --------------------------------------------
+
+# 1. Fichiers temporaires Python
+# --------------------------------------------
+
+# Ignorer les fichiers compilés Python
+*.pyc
+*.pyo
+__pycache__/
+
+# Ignorer les fichiers d'installation de l'environnement virtuel
+.venv/
+venv/
+env/
+ENV/
+
+# 2. Fichiers générés par PyInstaller
+# --------------------------------------------
+
+# Ignorer les fichiers et dossiers générés par PyInstaller
+build/
+dist/
+*.spec
+
+# 3. Fichiers de configuration
+# --------------------------------------------
+
+# Ignorer les fichiers de configuration de l'IDE ou de l'éditeur
+.idea/
+.vscode/
+
+# 4. Fichiers générés par pytest
+# --------------------------------------------
+
+# Ignorer les fichiers de cache générés par pytest
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# 5. Fichiers de dépendances de packages
+# --------------------------------------------
+
+# Ignorer les fichiers liés à des gestionnaires de dépendances comme pip, pipenv, ou conda
+Pipfile
+Pipfile.lock
+poetry.lock
+*.egg-info/
+
+# 6. Dossiers et fichiers générés par le processus de packaging (deb, rpm)
+# --------------------------------------------
+
+# Dossiers contenant les paquets générés
+packaging/
+rpmbuild/
+release/
+*.deb
+*.rpm
+
+# 7. Fichiers spécifiques à l'environnement de développement
+# --------------------------------------------
+
+# Ignorer les fichiers journaux et les fichiers temporaires
+*.log
+*.bak
+*.swp
+*.swo
+
+# 8. Fichiers spécifiques à la documentation
+# --------------------------------------------
+
+# Ignorer les fichiers temporaires générés par les outils de documentation
+*.tmp
+*.bak
+
+# 9. Fichiers binaires de distribution
+# --------------------------------------------
+
+# Ignorer les fichiers binaires générés par les builds
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 10. Fichiers de gestion de version
+# --------------------------------------------
+
+# Ignorer les fichiers spécifiques aux systèmes de contrôle de version
+.git/
+.gitmodules
+
+# 11. Fichiers générés par le processus de test
+# --------------------------------------------
+
+# Ignorer les fichiers de cache générés par les tests (pytest)
+*.pytest_cache/

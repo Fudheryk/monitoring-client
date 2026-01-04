@@ -1,0 +1,12 @@
+metadata:
+  vendor: "acme.nginx"
+  language: "bash"     # défaut pour ce fichier
+
+metrics:
+  - name: "nginx.requests_per_sec"
+    command: "echo 42"
+    language: "bash"   # optionnel, surcharge du global
+    type: "numeric"
+    group_name: "nginx"
+    description: "Nombre de requêtes par seconde (factice)."
+    is_critical: true
