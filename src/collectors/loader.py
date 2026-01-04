@@ -20,7 +20,6 @@ from .builtin.scheduled_tasks import ScheduledTasksCollector
 from .builtin.security import SecurityCollector
 from .builtin.services import ServicesCollector
 from .builtin.system import SystemCollector
-from .builtin.system_metrics import SystemMetricsCollector
 from .builtin.updates import PackageUpdatesCollector
 
 logger = get_logger(__name__)

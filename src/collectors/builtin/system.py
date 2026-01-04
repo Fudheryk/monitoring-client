@@ -38,7 +38,8 @@ class SystemCollector(BaseCollector):
 
     Métriques dynamiques (collectées à chaque run) :
       - cpu.usage_percent
-      - cpu.load_1m / 5m / 15m
+      - cpu.count
+      - system.load_1m / 5m / 15m
       - memory.usage_percent
       - memory.available_gb
       - memory.total_bytes
@@ -47,6 +48,10 @@ class SystemCollector(BaseCollector):
       - swap.total_bytes
       - system.uptime_seconds
       - system.process_count
+      - disk[<mountpoint>].usage_percent
+      - disk[<mountpoint>].total_gb
+      - disk[<mountpoint>].free_gb
+      - temperature.<sensor>.current (si disponible)
     """
 
     name = "system"
@@ -166,6 +171,20 @@ class SystemCollector(BaseCollector):
         except Exception as exc:
             logger.debug("Échec collecte CPU usage: %s", exc)
 
+        # CPU count
+        try:
+            cpu_count = psutil.cpu_count(logical=True)
+            if cpu_count is not None:
+                metrics.append(
+                    {
+                        "name": "cpu.count",
+                        "value": int(cpu_count),
+                        "type": "numeric",
+                    }
+                )
+        except Exception as exc:
+            logger.debug("Échec collecte CPU count: %s", exc)
+
         # Load average (Unix)
         try:
             if hasattr(os, "getloadavg"):
@@ -273,5 +292,67 @@ class SystemCollector(BaseCollector):
             )
         except Exception as exc:
             logger.debug("Échec collecte process count: %s", exc)
+
+        # === MÉTRIQUES DISQUE ===
+        try:
+            for partition in psutil.disk_partitions(all=False):
+                mountpoint = partition.mountpoint
+                
+                # Filtrer les systèmes de fichiers spéciaux
+                skip_fs_types = ['squashfs', 'tmpfs', 'devtmpfs', 'overlay', 'proc', 'sysfs', 'cgroup']
+                if partition.fstype in skip_fs_types:
+                    continue
+                
+                # Éviter les points de montage spéciaux
+                if mountpoint.startswith(('/sys', '/proc', '/dev', '/run')):
+                    continue
+                
+                try:
+                    disk_usage = psutil.disk_usage(mountpoint)
+                    
+                    # Format : disk[<mountpoint>].usage_percent
+                    metrics.extend([
+                        {
+                            "name": f"disk[{mountpoint}].usage_percent",
+                            "value": float(disk_usage.percent),
+                            "type": "numeric",
+                        },
+                        {
+                            "name": f"disk[{mountpoint}].total_gb",
+                            "value": round(disk_usage.total / (1024**3), 2),
+                            "type": "numeric",
+                        },
+                        {
+                            "name": f"disk[{mountpoint}].free_gb",
+                            "value": round(disk_usage.free / (1024**3), 2),
+                            "type": "numeric",
+                        }
+                    ])
+                except (PermissionError, FileNotFoundError):
+                    # Partition non accessible
+                    continue
+                except Exception as exc:
+                    logger.debug("Erreur sur la partition %s: %s", mountpoint, exc)
+                    
+        except Exception as exc:
+            logger.debug("Échec collecte disque: %s", exc)
+
+        # === MÉTRIQUES TEMPÉRATURE ===
+        try:
+            if hasattr(psutil, "sensors_temperatures"):
+                temps = psutil.sensors_temperatures()
+                if temps:
+                    for label, entries in temps.items():
+                        for idx, temp in enumerate(entries):
+                            sensor_name = f"{label}.{idx}"
+                            metrics.append(
+                                {
+                                    "name": f"temperature.{sensor_name}.current",
+                                    "value": float(temp.current),
+                                    "type": "numeric",
+                                }
+                            )
+        except Exception as exc:
+            logger.debug("Échec collecte températures: %s", exc)
 
         return metrics

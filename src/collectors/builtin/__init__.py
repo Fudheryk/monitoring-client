@@ -1,4 +1,4 @@
-# src/collectors/builtin/__init__.py
+from ..base_collector import BaseCollector, Metric  # ← Deux points pour remonter d'un niveau
 from .databases import DatabasesCollector
 from .docker import DockerCollector
 from .firewall import FirewallCollector
@@ -8,19 +8,19 @@ from .scheduled_tasks import ScheduledTasksCollector
 from .security import SecurityCollector
 from .services import ServicesCollector
 from .system import SystemCollector
-from .system_metrics import SystemMetricsCollector
 from .updates import PackageUpdatesCollector
 
 __all__ = [
-    'DatabasesCollector',
-    'DockerCollector',
-    'FirewallCollector',
-    'LogAnomaliesCollector',
-    'NetworkCollector',
-    'ScheduledTasksCollector',
-    'SecurityCollector',
-    'ServicesCollector',
-    'SystemMetricsCollector',
+    'BaseCollector',
+    'Metric',
     'SystemCollector',
+    'NetworkCollector',
+    'FirewallCollector',
     'PackageUpdatesCollector',
+    'ServicesCollector',
+    'SecurityCollector',
+    'ScheduledTasksCollector',
+    'LogAnomaliesCollector',
+    'DockerCollector',
+    'DatabasesCollector',
 ]

@@ -60,28 +60,28 @@ class ScheduledTasksCollector(BaseCollector):
         metrics.extend(
             [
                 {
-                    "name": "scheduled_tasks.cron.available",
+                    "name": "cron.available",
                     "value": bool(cron_active),
                     "type": "boolean",
                     "description": "Indique si le service cron est disponible",
                     "is_critical": False,
                 },
                 {
-                    "name": "scheduled_tasks.cron.jobs_count",
+                    "name": "cron.jobs_count",
                     "value": int(cron_jobs),
                     "type": "numeric",
                     "description": "Nombre de tâches cron programmées (via /etc/crontab)",
                     "is_critical": False,
                 },
                 {
-                    "name": "scheduled_tasks.anacron.available",
+                    "name": "anacron.available",
                     "value": bool(anacron_active),
                     "type": "boolean",
                     "description": "Indique si le service Anacron est disponible",
                     "is_critical": False,
                 },
                 {
-                    "name": "scheduled_tasks.systemd_timers.count",
+                    "name": "systemd_timers.count",
                     "value": int(timers_count),
                     "type": "numeric",
                     "description": "Nombre de timers systemd (tous états confondus)",
@@ -91,3 +91,4 @@ class ScheduledTasksCollector(BaseCollector):
         )
 
         return metrics
+
