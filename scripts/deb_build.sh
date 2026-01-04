@@ -250,6 +250,17 @@ EOF
 echo "[deb] ✓ Fichier control créé"
 
 # -----------------------------------------------------------------------------
+# Fichier DEBIAN/conffiles (préserver config lors upgrade)
+# -----------------------------------------------------------------------------
+echo "[deb] Création du fichier conffiles..."
+
+cat > "${PKG_DIR}/DEBIAN/conffiles" <<'CONFFILES'
+/etc/monitoring-client/config.yaml
+CONFFILES
+
+echo "[deb] ✓ Fichier conffiles créé"
+
+# -----------------------------------------------------------------------------
 # Script postinst (post-installation)
 # -----------------------------------------------------------------------------
 echo "[deb] Création du script postinst..."
@@ -274,7 +285,14 @@ mkdir -p /var/cache/monitoring-client
 
 # Permissions strictes
 chmod 755 /usr/local/bin/monitoring-client
-chmod 644 /etc/monitoring-client/config.yaml
+
+# ✅ Vérifier existence avant chmod
+if [[ -f /etc/monitoring-client/config.yaml ]]; then
+  chmod 644 /etc/monitoring-client/config.yaml
+else
+  log "⚠️  config.yaml manquant - devrait être installé par dpkg"
+fi
+
 chmod 755 /opt/monitoring-client/{data,vendors}
 chmod 755 /var/log/monitoring-client
 chmod 755 /var/cache/monitoring-client
@@ -422,36 +440,58 @@ log() {
   echo "[postrm] $1" | tee -a /var/log/monitoring-client-install.log
 }
 
-log ""
-log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-log "Nettoyage post-suppression"
-log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# ✅ ACTIONS DPKG
+# $1 = "remove"   → suppression (GARDER config/données/logs/vendors/api_key)
+# $1 = "purge"    → purge complète (SUPPRIMER TOUT)
+# $1 = "upgrade"  → mise à jour (NE RIEN SUPPRIMER)
+# $1 = "disappear", "failed-upgrade", "abort-*" → erreurs (NE RIEN SUPPRIMER)
 
-# Suppression complète des fichiers et répertoires
-rm -rf /opt/monitoring-client/data
-rm -rf /opt/monitoring-client/vendors
-rm -rf /var/log/monitoring-client
-rm -rf /var/cache/monitoring-client
-rm -rf /etc/monitoring-client
-
-# Si /opt/monitoring-client est vide, le supprimer aussi
-if [[ -d /opt/monitoring-client ]] && [[ -z "$(ls -A /opt/monitoring-client)" ]]; then
-  rmdir /opt/monitoring-client
-  log "✓ Répertoire /opt/monitoring-client supprimé (vide)"
-fi
-
-# Recharger systemd après suppression des fichiers
-systemctl daemon-reload 2>/dev/null || true
-log "✓ systemd rechargé"
-
-log ""
-log "✓ Monitoring Client désinstallé complètement"
-log ""
-log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-log "   Suppression complète effectuée."
-log "   Log final : /var/log/monitoring-client-install.log"
-log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-log ""
+case "$1" in
+  purge)
+    log ""
+    log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    log "Purge complète (action: $1)"
+    log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # Supprimer TOUT lors d'un purge
+    rm -rf /opt/monitoring-client
+    rm -rf /var/log/monitoring-client
+    rm -rf /var/cache/monitoring-client
+    rm -rf /etc/monitoring-client
+    
+    systemctl daemon-reload 2>/dev/null || true
+    
+    log "✓ Tous les fichiers supprimés (purge)"
+    log ""
+    ;;
+    
+  remove)
+    log ""
+    log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    log "Suppression (action: $1)"
+    log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # En mode "remove", préserver config/données/logs/vendors
+    # Supprimer uniquement le cache (non critique)
+    rm -rf /var/cache/monitoring-client
+    
+    systemctl daemon-reload 2>/dev/null || true
+    
+    log "✓ Cache supprimé"
+    log "ℹ️  Configuration, données, logs et vendors préservés"
+    log "   Pour tout supprimer : sudo dpkg --purge monitoring-client"
+    log ""
+    ;;
+    
+  upgrade|disappear|failed-upgrade|abort-install|abort-upgrade)
+    # ✅ CRITIQUE : Ne rien supprimer pendant une mise à jour
+    log "Action détectée : $1 - aucune suppression (préservation des données)"
+    ;;
+    
+  *)
+    log "Action inconnue dans postrm : $1"
+    ;;
+esac
 
 exit 0
 POSTRM
