@@ -74,7 +74,7 @@ class ServicesCollector(BaseCollector):
 
             metrics.append(
                 {
-                    "name": f"service.{safe_service_name}",
+                    "name": f"{safe_service_name}.service",
                     "value": bool(is_active),
                     "type": "boolean",
                     "description": f"Indique si le service {service_name} est actif (running).",
