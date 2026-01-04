@@ -1,8 +1,8 @@
 # src/collectors/builtin/docker.py
 
+import logging
 import os
 import subprocess
-import logging
 
 from collectors.base_collector import BaseCollector
 
@@ -37,8 +37,7 @@ class DockerCollector(BaseCollector):
             )
             docker_running = result.returncode == 0
         except Exception as exc:  # pragma: no cover - log only
-            logger.warning(
-                "Erreur lors de l'exécution de 'docker info' : %s", exc)
+            logger.warning("Erreur lors de l'exécution de 'docker info' : %s", exc)
 
         # Statut du démon Docker
         metrics.append(
@@ -48,7 +47,8 @@ class DockerCollector(BaseCollector):
                 "type": "boolean",
                 "description": "Indique si le démon Docker est en cours d'exécution.",
                 "is_critical": True,
-            })
+            }
+        )
 
         if not docker_running:
             return metrics
@@ -63,9 +63,7 @@ class DockerCollector(BaseCollector):
                 universal_newlines=True,
                 check=False,
             )
-            total_containers = len(
-                [l for l in containers_result.stdout.strip().split("\n") if l.strip()]
-            )
+            total_containers = len([l for l in containers_result.stdout.strip().split("\n") if l.strip()])
 
             # Conteneurs en cours d'exécution
             running_result = subprocess.run(
@@ -75,9 +73,7 @@ class DockerCollector(BaseCollector):
                 universal_newlines=True,
                 check=False,
             )
-            running_containers = len(
-                [l for l in running_result.stdout.strip().split("\n") if l.strip()]
-            )
+            running_containers = len([l for l in running_result.stdout.strip().split("\n") if l.strip()])
 
             # Images Docker
             images_result = subprocess.run(
@@ -87,9 +83,7 @@ class DockerCollector(BaseCollector):
                 universal_newlines=True,
                 check=False,
             )
-            total_images = len(
-                [l for l in images_result.stdout.strip().split("\n") if l.strip()]
-            )
+            total_images = len([l for l in images_result.stdout.strip().split("\n") if l.strip()])
 
             # Conteneurs en pause
             paused_result = subprocess.run(
@@ -99,37 +93,41 @@ class DockerCollector(BaseCollector):
                 universal_newlines=True,
                 check=False,
             )
-            paused_containers = len(
-                [l for l in paused_result.stdout.strip().split("\n") if l.strip()]
-            )
+            paused_containers = len([l for l in paused_result.stdout.strip().split("\n") if l.strip()])
 
-            metrics.extend([{"name": "docker.containers_total",
-                             "value": int(total_containers),
-                             "type": "numeric",
-                             "description": "Nombre total de conteneurs Docker (y compris stoppés).",
-                             "is_critical": True,
-                             },
-                            {"name": "docker.containers_running",
-                             "value": int(running_containers),
-                             "type": "numeric",
-                             "description": "Nombre de conteneurs Docker en cours d'exécution.",
-                             "is_critical": True,
-                             },
-                            {"name": "docker.images_total",
-                             "value": int(total_images),
-                             "type": "numeric",
-                             "description": "Nombre total d'images Docker sur le système.",
-                             "is_critical": False,
-                             },
-                            {"name": "docker.containers_paused",
-                             "value": int(paused_containers),
-                             "type": "numeric",
-                             "description": "Nombre de conteneurs Docker actuellement en pause.",
-                             "is_critical": False,
-                             },
-                            ])
+            metrics.extend(
+                [
+                    {
+                        "name": "docker.containers_total",
+                        "value": int(total_containers),
+                        "type": "numeric",
+                        "description": "Nombre total de conteneurs Docker (y compris stoppés).",
+                        "is_critical": True,
+                    },
+                    {
+                        "name": "docker.containers_running",
+                        "value": int(running_containers),
+                        "type": "numeric",
+                        "description": "Nombre de conteneurs Docker en cours d'exécution.",
+                        "is_critical": True,
+                    },
+                    {
+                        "name": "docker.images_total",
+                        "value": int(total_images),
+                        "type": "numeric",
+                        "description": "Nombre total d'images Docker sur le système.",
+                        "is_critical": False,
+                    },
+                    {
+                        "name": "docker.containers_paused",
+                        "value": int(paused_containers),
+                        "type": "numeric",
+                        "description": "Nombre de conteneurs Docker actuellement en pause.",
+                        "is_critical": False,
+                    },
+                ]
+            )
         except Exception as exc:  # pragma: no cover - log only
-            logger.warning(
-                "Erreur lors de la collecte des métriques Docker : %s", exc)
+            logger.warning("Erreur lors de la collecte des métriques Docker : %s", exc)
 
         return metrics

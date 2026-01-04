@@ -8,22 +8,20 @@ Loader des collecteurs builtin.
 
 from typing import List
 
-from .base_collector import BaseCollector, Metric
-
-from .builtin.system import SystemCollector
-from .builtin.network import NetworkCollector
-from .builtin.firewall import FirewallCollector
-from .builtin.updates import PackageUpdatesCollector
-from .builtin.system_metrics import SystemMetricsCollector
-from .builtin.services import ServicesCollector
-from .builtin.security import SecurityCollector
-from .builtin.scheduled_tasks import ScheduledTasksCollector
-from .builtin.log_anomalies import LogAnomaliesCollector
-from .builtin.docker import DockerCollector
-from .builtin.databases import DatabasesCollector
-
 from core.logger import get_logger, log_phase
 
+from .base_collector import BaseCollector, Metric
+from .builtin.databases import DatabasesCollector
+from .builtin.docker import DockerCollector
+from .builtin.firewall import FirewallCollector
+from .builtin.log_anomalies import LogAnomaliesCollector
+from .builtin.network import NetworkCollector
+from .builtin.scheduled_tasks import ScheduledTasksCollector
+from .builtin.security import SecurityCollector
+from .builtin.services import ServicesCollector
+from .builtin.system import SystemCollector
+from .builtin.system_metrics import SystemMetricsCollector
+from .builtin.updates import PackageUpdatesCollector
 
 logger = get_logger(__name__)
 
@@ -40,20 +38,16 @@ def get_builtin_collectors() -> List[BaseCollector]:
     return [
         # Contexte système (hostname, os, uptime, load, etc.)
         SystemCollector(),
-
         # Réseau / firewall
         NetworkCollector(),
         FirewallCollector(),
-
         # Packages & updates
         PackageUpdatesCollector(),
-
         # Services / sécurité / tâches
         ServicesCollector(),
         SecurityCollector(),
         ScheduledTasksCollector(),
         LogAnomaliesCollector(),
-
         # Runtime / DB
         DockerCollector(),
         DatabasesCollector(),

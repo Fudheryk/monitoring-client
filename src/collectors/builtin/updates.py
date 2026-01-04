@@ -1,8 +1,8 @@
 # src/collectors/builtin/updates.py
 
+import logging
 import os
 import subprocess
-import logging
 
 from collectors.base_collector import BaseCollector
 
@@ -39,36 +39,31 @@ class PackageUpdatesCollector(BaseCollector):
                 universal_newlines=True,
                 check=False,
             )
-            lines = [
-                l
-                for l in update_check.stdout.strip().split("\n")
-                if l.strip() and "/" in l
-            ]
+            lines = [l for l in update_check.stdout.strip().split("\n") if l.strip() and "/" in l]
             updates_available = len(lines)
 
             # Mises à jour de sécurité (approx : recherche "security" dans la
             # ligne)
-            security_updates = len(
+            security_updates = len([l for l in update_check.stdout.split("\n") if "security" in l.lower()])
+
+            metrics.extend(
                 [
-                    l
-                    for l in update_check.stdout.split("\n")
-                    if "security" in l.lower()
+                    {
+                        "name": "apt.updates_available",
+                        "value": int(updates_available),
+                        "type": "numeric",
+                        "description": "Nombre de mises à jour disponibles pour les paquets APT.",
+                        "is_critical": False,
+                    },
+                    {
+                        "name": "apt.security_updates",
+                        "value": int(security_updates),
+                        "type": "numeric",
+                        "description": "Nombre de mises à jour de sécurité disponibles pour APT.",
+                        "is_critical": True,
+                    },
                 ]
             )
-
-            metrics.extend([{"name": "apt.updates_available",
-                             "value": int(updates_available),
-                             "type": "numeric",
-                             "description": "Nombre de mises à jour disponibles pour les paquets APT.",
-                             "is_critical": False,
-                             },
-                            {"name": "apt.security_updates",
-                             "value": int(security_updates),
-                             "type": "numeric",
-                             "description": "Nombre de mises à jour de sécurité disponibles pour APT.",
-                             "is_critical": True,
-                             },
-                            ])
 
             # Version APT
             version_result = subprocess.run(
@@ -78,11 +73,7 @@ class PackageUpdatesCollector(BaseCollector):
                 universal_newlines=True,
                 check=False,
             )
-            apt_version = (
-                version_result.stdout.strip().split("\n")[0]
-                if version_result.returncode == 0
-                else "unknown"
-            )
+            apt_version = version_result.stdout.strip().split("\n")[0] if version_result.returncode == 0 else "unknown"
             metrics.append(
                 {
                     "name": "apt.version",
@@ -93,8 +84,7 @@ class PackageUpdatesCollector(BaseCollector):
                 }
             )
         except Exception as exc:  # pragma: no cover - log only
-            logger.warning(
-                "Erreur lors de la collecte des mises à jour APT : %s", exc)
+            logger.warning("Erreur lors de la collecte des mises à jour APT : %s", exc)
 
     def _collect_yum_dnf(self, cmd: str, metrics):
         try:
@@ -107,13 +97,7 @@ class PackageUpdatesCollector(BaseCollector):
             )
             # Heuristique simple : lignes non vides et ne commençant pas par
             # "Last"
-            updates = len(
-                [
-                    l
-                    for l in result.stdout.split("\n")
-                    if l.strip() and not l.startswith("Last")
-                ]
-            )
+            updates = len([l for l in result.stdout.split("\n") if l.strip() and not l.startswith("Last")])
             metrics.append(
                 {
                     "name": f"{cmd}.updates_available",
@@ -121,7 +105,8 @@ class PackageUpdatesCollector(BaseCollector):
                     "type": "numeric",
                     "description": f"Nombre de mises à jour disponibles pour les paquets {cmd}.",
                     "is_critical": False,
-                })
+                }
+            )
 
             version_result = subprocess.run(
                 [cmd, "--version"],
@@ -130,19 +115,15 @@ class PackageUpdatesCollector(BaseCollector):
                 universal_newlines=True,
                 check=False,
             )
-            pkg_version = (
-                version_result.stdout.strip().split("\n")[0]
-                if version_result.returncode == 0
-                else "unknown"
+            pkg_version = version_result.stdout.strip().split("\n")[0] if version_result.returncode == 0 else "unknown"
+            metrics.append(
+                {
+                    "name": f"{cmd}.version",
+                    "value": pkg_version,
+                    "type": "string",
+                    "description": f"Version actuelle de {cmd} sur le système.",
+                    "is_critical": False,
+                }
             )
-            metrics.append({"name": f"{cmd}.version",
-                            "value": pkg_version,
-                            "type": "string",
-                            "description": f"Version actuelle de {cmd} sur le système.",
-                            "is_critical": False,
-                            })
         except Exception as exc:  # pragma: no cover - log only
-            logger.warning(
-                "Erreur lors de la collecte des mises à jour via %s : %s",
-                cmd,
-                exc)
+            logger.warning("Erreur lors de la collecte des mises à jour via %s : %s", cmd, exc)

@@ -5,9 +5,9 @@ import shutil
 import subprocess
 from typing import Any, Dict, List
 
-from ..base_collector import BaseCollector, Metric
 from core.logger import get_logger
 
+from ..base_collector import BaseCollector, Metric
 
 logger = get_logger(__name__)
 
@@ -112,9 +112,7 @@ class FirewallCollector(BaseCollector):
                     [
                         line
                         for line in result.stdout.splitlines()
-                        if line.strip()
-                        and not line.startswith("Chain")
-                        and not line.startswith("target")
+                        if line.strip() and not line.startswith("Chain") and not line.startswith("target")
                     ]
                 )
                 m.append(
@@ -125,8 +123,7 @@ class FirewallCollector(BaseCollector):
                     }
                 )
         except Exception as exc:
-            logger.debug(
-                "Échec de la collecte firewall.iptables.rules_count: %s", exc)
+            logger.debug("Échec de la collecte firewall.iptables.rules_count: %s", exc)
 
         # Version iptables
         try:
@@ -146,8 +143,7 @@ class FirewallCollector(BaseCollector):
                 }
             )
         except Exception as exc:
-            logger.debug(
-                "Échec de la collecte firewall.iptables.version: %s", exc)
+            logger.debug("Échec de la collecte firewall.iptables.version: %s", exc)
 
         return m
 
@@ -176,8 +172,7 @@ class FirewallCollector(BaseCollector):
                 }
             )
         except Exception as exc:
-            logger.debug(
-                "Échec de la collecte firewall.firewalld.running: %s", exc)
+            logger.debug("Échec de la collecte firewall.firewalld.running: %s", exc)
 
         # Version firewalld
         try:
@@ -197,8 +192,7 @@ class FirewallCollector(BaseCollector):
                 }
             )
         except Exception as exc:
-            logger.debug(
-                "Échec de la collecte firewall.firewalld.version: %s", exc)
+            logger.debug("Échec de la collecte firewall.firewalld.version: %s", exc)
 
         return m
 

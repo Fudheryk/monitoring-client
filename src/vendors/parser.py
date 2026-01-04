@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from core.logger import get_logger, log_phase
-from .validator import VendorDocument, VendorSchemaError, validate_vendor_document
 
+from .validator import VendorDocument, VendorSchemaError, validate_vendor_document
 
 logger = get_logger(__name__)
 
@@ -127,9 +127,7 @@ class VendorParser:
             if not entry.is_file():
                 continue
 
-            if entry.name.endswith((".yaml", ".yml")) and not entry.name.endswith(
-                (".disabled", ".example")
-            ):
+            if entry.name.endswith((".yaml", ".yml")) and not entry.name.endswith((".disabled", ".example")):
                 files.append(entry)
 
         logger.debug("Fichiers vendor détectés: %s", [str(f) for f in files])
@@ -153,8 +151,7 @@ class VendorParser:
 
         if not isinstance(data, dict):
             raise VendorSchemaError(
-                f"Le contenu YAML doit être un objet (mapping) dans {path}, "
-                f"trouvé {type(data)}."
+                f"Le contenu YAML doit être un objet (mapping) dans {path}, " f"trouvé {type(data)}."
             )
 
         return data

@@ -7,10 +7,9 @@ from .network import NetworkCollector
 from .scheduled_tasks import ScheduledTasksCollector
 from .security import SecurityCollector
 from .services import ServicesCollector
-from .system_metrics import SystemMetricsCollector
 from .system import SystemCollector
+from .system_metrics import SystemMetricsCollector
 from .updates import PackageUpdatesCollector
-
 
 __all__ = [
     'DatabasesCollector',

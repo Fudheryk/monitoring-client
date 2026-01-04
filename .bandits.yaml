@@ -1,0 +1,30 @@
+# -----------------------------------------------------------------------------
+# .bandit.yaml - Configuration Bandit pour l'analyse de sécurité
+# -----------------------------------------------------------------------------
+
+# Tests à ignorer
+skips:
+  # B101: assert_used - Les asserts sont OK dans les tests
+  - B101
+  # B601: paramiko_calls - Si vous utilisez paramiko
+  # - B601
+
+# Exclusions de fichiers/répertoires
+exclude_dirs:
+  - /test
+  - /tests
+  - /.venv
+  - /venv
+  - /build
+  - /dist
+
+# Niveau de sévérité minimum
+# Options: LOW, MEDIUM, HIGH
+severity:
+  - MEDIUM
+  - HIGH
+
+# Niveau de confiance minimum
+confidence:
+  - MEDIUM
+  - HIGH

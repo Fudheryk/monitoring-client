@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Tuple
 
 from core.logger import get_logger, log_phase
 
-
 logger = get_logger(__name__)
 
 MetricDict = Dict[str, Any]
@@ -131,10 +130,7 @@ class PayloadValidator:
             errors.append(
                 ValidationError(
                     path="$",
-                    message=(
-                        "Payload racine invalide, dict attendu, "
-                        f"trouvé {type(payload)}."
-                    ),
+                    message=("Payload racine invalide, dict attendu, " f"trouvé {type(payload)}."),
                 )
             )
             return False, [e.to_dict() for e in errors]
@@ -154,10 +150,7 @@ class PayloadValidator:
             errors.append(
                 ValidationError(
                     path="$.metrics",
-                    message=(
-                        "Le champ 'metrics' doit être une liste, "
-                        f"trouvé {type(metrics)}."
-                    ),
+                    message=("Le champ 'metrics' doit être une liste, " f"trouvé {type(metrics)}."),
                 )
             )
             # On continue malgré tout, mais sans itérer si ce n'est pas une liste
@@ -171,10 +164,7 @@ class PayloadValidator:
                 errors.append(
                     ValidationError(
                         path=path_prefix,
-                        message=(
-                            "Métrique invalide, dict attendu, "
-                            f"trouvé {type(metric)}."
-                        ),
+                        message=("Métrique invalide, dict attendu, " f"trouvé {type(metric)}."),
                     )
                 )
                 continue
@@ -192,10 +182,7 @@ class PayloadValidator:
                 errors.append(
                     ValidationError(
                         path=f"{path_prefix}.name",
-                        message=(
-                            f"Nom de métrique invalide: {name!r} "
-                            "(autorisé: alphanumérique + . + - + _)."
-                        ),
+                        message=(f"Nom de métrique invalide: {name!r} " "(autorisé: alphanumérique + . + - + _)."),
                     )
                 )
 
@@ -215,10 +202,7 @@ class PayloadValidator:
                 errors.append(
                     ValidationError(
                         path=f"{path_prefix}.type",
-                        message=(
-                            "Champ 'type' doit être une chaîne, "
-                            f"trouvé {type(m_type)}."
-                        ),
+                        message=("Champ 'type' doit être une chaîne, " f"trouvé {type(m_type)}."),
                     )
                 )
                 continue
@@ -229,8 +213,7 @@ class PayloadValidator:
                     ValidationError(
                         path=f"{path_prefix}.type",
                         message=(
-                            f"Type de métrique non supporté: {m_type!r}. "
-                            f"Types autorisés: {sorted(_ALLOWED_TYPES)}."
+                            f"Type de métrique non supporté: {m_type!r}. " f"Types autorisés: {sorted(_ALLOWED_TYPES)}."
                         ),
                     )
                 )
@@ -251,10 +234,7 @@ class PayloadValidator:
                 errors.append(
                     ValidationError(
                         path=f"{path_prefix}.value",
-                        message=(
-                            f"Valeur '{value!r}' incohérente avec "
-                            f"le type déclaré '{m_type}'."
-                        ),
+                        message=(f"Valeur '{value!r}' incohérente avec " f"le type déclaré '{m_type}'."),
                     )
                 )
 

@@ -1,5 +1,6 @@
 from src.pipeline.validator import PayloadValidator
 
+
 def test_validator_ok():
     v = PayloadValidator()
     payload = {
@@ -18,9 +19,7 @@ def test_validator_ok():
 
 def test_validator_bad_name():
     v = PayloadValidator()
-    payload = {"metadata": {}, "machine": {}, "metrics": [
-        {"name": "bad name !", "value": 1, "type": "numeric"}
-    ]}
+    payload = {"metadata": {}, "machine": {}, "metrics": [{"name": "bad name !", "value": 1, "type": "numeric"}]}
     valid, errors = v.validate_payload(payload)
     assert not valid
     assert len(errors) == 1

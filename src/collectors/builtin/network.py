@@ -4,9 +4,9 @@ from typing import Any, Dict, List
 
 import psutil
 
-from ..base_collector import BaseCollector, Metric
 from core.logger import get_logger
 
+from ..base_collector import BaseCollector, Metric
 
 logger = get_logger(__name__)
 
@@ -120,9 +120,6 @@ class NetworkCollector(BaseCollector):
                 )
 
             except Exception as exc:
-                logger.debug(
-                    "Échec de la collecte réseau pour l'interface %s: %s",
-                    iface,
-                    exc)
+                logger.debug("Échec de la collecte réseau pour l'interface %s: %s", iface, exc)
 
         return metrics

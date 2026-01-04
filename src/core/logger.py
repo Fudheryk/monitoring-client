@@ -4,7 +4,6 @@ import os
 import sys
 from typing import Optional
 
-
 _LOGGER_CONFIGURED = False
 
 

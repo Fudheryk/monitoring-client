@@ -1,7 +1,8 @@
-[![Release](https://img.shields.io/github/v/release/your-org/monitoring-client)](https://github.com/your-org/monitoring-client/releases)
+[![Release](https://img.shields.io/github/v/release/Fudheryk/monitoring-client)](https://github.com/Fudheryk/monitoring-client/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/github/actions/workflow/status/your-org/monitoring-client/tests.yml?label=tests)](https://github.com/your-org/monitoring-client/actions)
+[![Tests](https://github.com/Fudheryk/monitoring-client/actions/workflows/python-tests.yml/badge.svg)]
+
 
 # 📘 **Monitoring Client — Documentation Officielle**
 

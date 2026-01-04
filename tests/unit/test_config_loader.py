@@ -1,12 +1,15 @@
 import os
 from pathlib import Path
-from src.core.config_loader import ConfigLoader, ConfigError
+
+from src.core.config_loader import ConfigError, ConfigLoader
+
 
 def test_config_loader_ok(tmp_path):
     config_path = tmp_path / "config.yaml"
     schema_path = Path("config/config.schema.json")
 
-    config_path.write_text("""
+    config_path.write_text(
+        """
 client:
   name: test-client
   version: "0.1"
@@ -33,7 +36,8 @@ logging:
   format: "plain"
   console_enabled: true
   file_enabled: false
-""")
+"""
+    )
     api_key_file = tmp_path / "foo"
     api_key_file.write_text("dummy-key")
 

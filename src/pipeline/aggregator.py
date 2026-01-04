@@ -4,7 +4,6 @@ from typing import Any, Dict, List
 
 from core.logger import get_logger, log_phase
 
-
 logger = get_logger(__name__)
 
 MetricDict = Dict[str, Any]

@@ -1,5 +1,6 @@
-from setuptools import setup, find_packages
 from pathlib import Path
+
+from setuptools import find_packages, setup
 
 ROOT = Path(__file__).parent
 
@@ -18,10 +19,10 @@ setup(
     include_package_data=True,
     python_requires=">=3.8",
     install_requires=[
-      "psutil",
-      "requests",
-      "PyYAML",
-      "jsonschema",
+        "psutil",
+        "requests",
+        "PyYAML",
+        "jsonschema",
     ],
     entry_points={
         "console_scripts": [

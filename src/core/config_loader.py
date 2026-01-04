@@ -9,7 +9,6 @@ import yaml
 
 from .logger import get_logger, log_phase
 
-
 logger = get_logger(__name__)
 
 
@@ -215,16 +214,12 @@ class ConfigLoader:
                 try:
                     target[key] = float(val)
                 except ValueError:
-                    logger.warning(
-                        "Variable d'environnement %s invalide (float attendu), ignorée.", env_var
-                    )
+                    logger.warning("Variable d'environnement %s invalide (float attendu), ignorée.", env_var)
             elif key in ("max_retries",):
                 try:
                     target[key] = int(val)
                 except ValueError:
-                    logger.warning(
-                        "Variable d'environnement %s invalide (int attendu), ignorée.", env_var
-                    )
+                    logger.warning("Variable d'environnement %s invalide (int attendu), ignorée.", env_var)
             else:
                 target[key] = val
 
@@ -304,8 +299,7 @@ class ConfigLoader:
         api_key_path = self._resolve_path(api_cfg.api_key_file, base_dir)
         if not api_key_path.is_file():
             raise ConfigError(
-                f"Fichier de clé API introuvable : {api_key_path} "
-                "(ou variable d'environnement non définie)"
+                f"Fichier de clé API introuvable : {api_key_path} " "(ou variable d'environnement non définie)"
             )
 
         try:

@@ -6,21 +6,17 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from core.logger import configure_logging, get_logger, log_phase
-from core.config_loader import ConfigLoader, ConfigError
-from core.fingerprint import generate_fingerprint, FingerprintError
-from core.api_client import build_api_client_from_config, APIClientError
-
+from __version__ import __version__
 from collectors.loader import run_builtin_collectors
-from vendors.parser import VendorParser
-from vendors.executor import CommandExecutor
-
+from core.api_client import APIClientError, build_api_client_from_config
+from core.config_loader import ConfigError, ConfigLoader
+from core.fingerprint import FingerprintError, generate_fingerprint
+from core.logger import configure_logging, get_logger, log_phase
 from pipeline.aggregator import MetricsAggregator
 from pipeline.transformer import PayloadTransformer, PayloadTransformerConfig
 from pipeline.validator import PayloadValidator
-
-from __version__ import __version__
-
+from vendors.executor import CommandExecutor
+from vendors.parser import VendorParser
 
 # Affiche la version du client
 print(f"Monitoring Client - Version {__version__}")
@@ -41,10 +37,9 @@ EXIT_NETWORK_ERROR = 3
 # CLI PARSING
 # ---------------------------------------------------------------------------
 
+
 def parse_cli_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Monitoring Client - Metrics Collector & Sender"
-    )
+    parser = argparse.ArgumentParser(description="Monitoring Client - Metrics Collector & Sender")
 
     parser.add_argument(
         "--config",
@@ -54,9 +49,7 @@ def parse_cli_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--dry-run",
-        help="Génère le payload mais n'envoie rien au serveur (affiche le JSON)",
-        action="store_true"
+        "--dry-run", help="Génère le payload mais n'envoie rien au serveur (affiche le JSON)", action="store_true"
     )
 
     parser.add_argument(
@@ -65,11 +58,7 @@ def parse_cli_args() -> argparse.Namespace:
         action="store_true",
     )
 
-    parser.add_argument(
-        "-v", "--version",
-        action="version",
-        version=f"%(prog)s {__version__}"
-    )
+    parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {__version__}")
 
     return parser.parse_args()
 
@@ -77,6 +66,7 @@ def parse_cli_args() -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 # MAIN ORCHESTRATION
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     args = parse_cli_args()
@@ -113,11 +103,7 @@ def main() -> int:
     # 3) FINGERPRINT
     # ------------------------
     try:
-        cache_path = (
-            config.base_dir
-            / config.paths.data_dir
-            / (config.fingerprint.cache_file or "fingerprint")
-        )
+        cache_path = config.base_dir / config.paths.data_dir / (config.fingerprint.cache_file or "fingerprint")
         fingerprint = generate_fingerprint(
             method=config.fingerprint.method,
             salt=config.fingerprint.salt,
@@ -133,11 +119,7 @@ def main() -> int:
     # 4) COLLECT BUILTIN METRICS
     # ------------------------
     builtin_metrics = run_builtin_collectors()
-    log_phase(
-        logger,
-        "builtin.collect",
-        f"✓ Collecte builtin terminée ({len(builtin_metrics)} métriques)"
-    )
+    log_phase(logger, "builtin.collect", f"✓ Collecte builtin terminée ({len(builtin_metrics)} métriques)")
 
     # ------------------------
     # 5) VENDOR METRICS : PARSE + EXECUTE
@@ -158,19 +140,17 @@ def main() -> int:
                     "type": vm.type,
                     "vendor": vm.vendor,
                     "group_name": vm.group_name,
-	            "description": vm.description,
-                    "is_critical": vm.is_critical
+                    "description": vm.description,
+                    "is_critical": vm.is_critical,
                 }
             )
         else:
-            logger.warning(
-                "Vendor metric '%s' ignorée (erreur d'exécution).", vm.name
-            )
+            logger.warning("Vendor metric '%s' ignorée (erreur d'exécution).", vm.name)
 
     log_phase(
         logger,
         "vendor.collect",
-        f"✓ Vendor : {len(vendor_docs)} définitions, {len(vendor_metrics)} métriques exécutées"
+        f"✓ Vendor : {len(vendor_docs)} définitions, {len(vendor_metrics)} métriques exécutées",
     )
 
     # ------------------------
@@ -220,17 +200,14 @@ def main() -> int:
     if args.dry_run:
         log_phase(logger, "dryrun", "✓ Mode dry-run, aucun envoi effectué")
         import json
+
         print(json.dumps(payload, indent=2))
         return EXIT_OK
 
     try:
         api_client = build_api_client_from_config(config)
         response = api_client.send_payload(payload)
-        log_phase(
-            logger,
-            "api.sent",
-            f"✓ Payload envoyé au serveur (HTTP {response.status_code})"
-        )
+        log_phase(logger, "api.sent", f"✓ Payload envoyé au serveur (HTTP {response.status_code})")
         return EXIT_OK
 
     except APIClientError as exc:
@@ -245,6 +222,7 @@ def main() -> int:
 # ---------------------------------------------------------------------------
 # Helpers internes
 # ---------------------------------------------------------------------------
+
 
 def _resolve_hostname(config) -> str:
     """
@@ -271,6 +249,7 @@ def _resolve_os(config) -> str:
         return config.machine.os_override
 
     import platform
+
     name = platform.system().lower()
     return "linux" if "linux" in name else name
 

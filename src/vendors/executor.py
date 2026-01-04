@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from core.logger import get_logger, log_phase
-from .parser import VendorMetric
 
+from .parser import VendorMetric
 
 logger = get_logger(__name__)
 
@@ -131,10 +131,7 @@ class CommandExecutor:
           executor.check_language_available("bash") -> True/False
         """
         normalized = lang.lower().strip()
-        return (
-            normalized in self._language_binaries
-            and self._language_binaries[normalized] is not None
-        )
+        return normalized in self._language_binaries and self._language_binaries[normalized] is not None
 
     def execute(
         self,

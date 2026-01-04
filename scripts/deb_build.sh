@@ -34,19 +34,19 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # -----------------------------------------------------------------------------
 function check_prerequisites() {
   echo "[check] Vérification des prérequis..."
-  
+
   # Vérifier systemctl
   if ! command -v systemctl &> /dev/null; then
     echo "❌ systemd n'est pas installé. L'installation ne peut pas continuer."
     exit 1
   fi
-  
+
   # Vérifier dpkg-deb
   if ! command -v dpkg-deb &> /dev/null; then
     echo "❌ dpkg-deb n'est pas installé. Veuillez installer 'dpkg'."
     exit 1
   fi
-  
+
   # Vérifier la version de systemd (minimum 226)
   SYSTEMD_VERSION=$(systemctl --version | head -n 1 | awk '{print $2}')
   if [[ "${SYSTEMD_VERSION}" -lt 226 ]]; then
@@ -55,17 +55,17 @@ function check_prerequisites() {
     echo "   Veuillez mettre à jour systemd."
     exit 1
   fi
-  
+
   echo "[check] ✓ systemd version ${SYSTEMD_VERSION} détecté"
-  
+
   # Vérifier Python 3 (pour le build PyInstaller)
   if ! command -v python3 &> /dev/null; then
     echo "❌ Python 3 n'est pas installé. Impossible de builder le binaire."
     exit 1
   fi
-  
+
   echo "[check] ✓ Python 3 détecté : $(python3 --version)"
-  
+
   # Vérifier PyInstaller
   if ! python3 -m pip show pyinstaller &> /dev/null; then
     echo "⚠️  PyInstaller n'est pas installé. Tentative d'installation..."
@@ -74,7 +74,7 @@ function check_prerequisites() {
       exit 1
     }
   fi
-  
+
   echo "[check] ✓ PyInstaller détecté"
   echo "[check] ✓ Tous les prérequis sont satisfaits"
 }
@@ -296,11 +296,11 @@ if [[ -f /etc/monitoring-client/api_key && -s /etc/monitoring-client/api_key ]];
   # Sécuriser la clé API
   chmod 600 /etc/monitoring-client/api_key
   log "✓ Clé API détectée et sécurisée (chmod 600)"
-  
+
   # Vérifier si le package est déjà installé (mise à jour)
   if dpkg-query -W -f='${Status}' monitoring-client 2>/dev/null | grep -q "install ok installed"; then
     log "✓ Mise à jour détectée"
-    
+
     # Redémarrer le timer si déjà actif
     if systemctl is-active --quiet monitoring-client.timer; then
       systemctl restart monitoring-client.timer

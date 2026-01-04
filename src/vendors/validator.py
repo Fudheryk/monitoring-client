@@ -8,7 +8,6 @@ import jsonschema
 
 from core.logger import get_logger
 
-
 logger = get_logger(__name__)
 
 
@@ -131,9 +130,7 @@ def _normalize_metadata_aliases(raw: Dict[str, Any]) -> Dict[str, Any]:
     # Compatibilité : certains fichiers peuvent utiliser "yamlmetadata"
     if "yamlmetadata" in raw and "metadata" not in raw:
         raw["metadata"] = raw.pop("yamlmetadata")
-        logger.debug(
-            "Alias 'yamlmetadata' détecté, normalisé en 'metadata' pour le fichier vendor."
-        )
+        logger.debug("Alias 'yamlmetadata' détecté, normalisé en 'metadata' pour le fichier vendor.")
 
     return raw
 
@@ -163,9 +160,7 @@ def validate_vendor_document(raw: Dict[str, Any], source: str) -> VendorDocument
     Lève VendorSchemaError si le document est invalide.
     """
     if not isinstance(raw, dict):
-        raise VendorSchemaError(
-            f"Document YAML racine invalide (dict attendu) dans {source}"
-        )
+        raise VendorSchemaError(f"Document YAML racine invalide (dict attendu) dans {source}")
 
     raw = _normalize_metadata_aliases(raw)
 
@@ -184,9 +179,7 @@ def validate_vendor_document(raw: Dict[str, Any], source: str) -> VendorDocument
     # Vérification : un fichier vendor ne doit pas utiliser vendor="builtin"
     vendor_name = (metadata.get("vendor") or "").strip().lower()
     if vendor_name == "builtin":
-        raise VendorSchemaError(
-            f"Fichier vendor invalide ({source}): 'vendor' ne doit pas être 'builtin'."
-        )
+        raise VendorSchemaError(f"Fichier vendor invalide ({source}): 'vendor' ne doit pas être 'builtin'.")
 
     # Normaliser language au niveau métrique + revalider name/group_name par sécurité
     metrics = raw.get("metrics") or []
@@ -199,8 +192,6 @@ def validate_vendor_document(raw: Dict[str, Any], source: str) -> VendorDocument
         for key in ("name", "group_name"):
             val = metric.get(key)
             if isinstance(val, str) and not re.match(_NAME_PATTERN, val):
-                raise VendorSchemaError(
-                    f"Champ '{key}' invalide dans {source}: '{val}' ne respecte pas le pattern."
-                )
+                raise VendorSchemaError(f"Champ '{key}' invalide dans {source}: '{val}' ne respecte pas le pattern.")
 
     return VendorDocument(data=raw, source=source)

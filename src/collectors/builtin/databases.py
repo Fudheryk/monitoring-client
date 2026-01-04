@@ -1,8 +1,8 @@
 # src/collectors/builtin/databases.py
 
+import logging
 import os
 import subprocess
-import logging
 
 from collectors.base_collector import BaseCollector
 
@@ -39,9 +39,11 @@ class DatabasesCollector(BaseCollector):
                     "type": "boolean",
                     "description": (
                         "Indique si le service MySQL est actif. "
-                        "Critique car MySQL est essentiel pour la gestion des bases de données."),
+                        "Critique car MySQL est essentiel pour la gestion des bases de données."
+                    ),
                     "is_critical": True,
-                })
+                }
+            )
 
         # MariaDB (si présent)
         if has_mariadb:
@@ -53,9 +55,11 @@ class DatabasesCollector(BaseCollector):
                     "type": "boolean",
                     "description": (
                         "Indique si le service MariaDB est actif. "
-                        "Critique car MariaDB est une alternative essentielle à MySQL."),
+                        "Critique car MariaDB est une alternative essentielle à MySQL."
+                    ),
                     "is_critical": True,
-                })
+                }
+            )
 
         # PostgreSQL
         if os.path.exists("/usr/bin/psql"):
@@ -68,9 +72,11 @@ class DatabasesCollector(BaseCollector):
                     "description": (
                         "Indique si le service PostgreSQL est actif. "
                         "Critique car PostgreSQL est une base de données relationnelle "
-                        "couramment utilisée."),
+                        "couramment utilisée."
+                    ),
                     "is_critical": True,
-                })
+                }
+            )
 
         # Redis
         if os.path.exists("/usr/bin/redis-server"):
@@ -82,9 +88,11 @@ class DatabasesCollector(BaseCollector):
                     "type": "boolean",
                     "description": (
                         "Indique si le service Redis est actif. "
-                        "Non critique mais important pour la mise en cache / données en mémoire."),
+                        "Non critique mais important pour la mise en cache / données en mémoire."
+                    ),
                     "is_critical": False,
-                })
+                }
+            )
 
         return metrics
 

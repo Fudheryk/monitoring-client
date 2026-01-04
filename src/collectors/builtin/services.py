@@ -1,8 +1,8 @@
 # src/collectors/builtin/services.py
 
-import subprocess
 import logging
 import re
+import subprocess
 
 from collectors.base_collector import BaseCollector
 
@@ -38,13 +38,10 @@ class ServicesCollector(BaseCollector):
                 check=False,
             )
         except FileNotFoundError:  # systemd absent
-            logger.info(
-                "systemctl introuvable, aucun service systemd à collecter.")
+            logger.info("systemctl introuvable, aucun service systemd à collecter.")
             return metrics
         except Exception as exc:  # pragma: no cover - log only
-            logger.warning(
-                "Erreur lors de l'exécution de systemctl list-units : %s", exc
-            )
+            logger.warning("Erreur lors de l'exécution de systemctl list-units : %s", exc)
             return metrics
 
         lines = result.stdout.strip().split("\n")
@@ -73,8 +70,7 @@ class ServicesCollector(BaseCollector):
                 failed_count += 1
 
             # Sanitize pour respecter ^[a-zA-Z0-9._-]+$
-            safe_service_name = self._metric_name_safe_re.sub(
-                "_", service_name)
+            safe_service_name = self._metric_name_safe_re.sub("_", service_name)
 
             metrics.append(
                 {

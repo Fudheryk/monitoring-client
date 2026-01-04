@@ -7,7 +7,6 @@ import requests
 
 from .logger import get_logger, log_phase
 
-
 logger = get_logger(__name__)
 
 
@@ -18,6 +17,7 @@ class APIClientConfig:
 
     Cette structure peut être construite à partir de Config (Tâche 1).
     """
+
     base_url: str
     metrics_endpoint: str
     api_key_header: str
@@ -117,18 +117,14 @@ class APIClient:
                         "Erreur client HTTP %s lors de l'envoi des métriques, pas de retry.",
                         response.status_code,
                     )
-                    raise APIClientError(
-                        f"Erreur client HTTP {response.status_code}: {response.text}"
-                    )
+                    raise APIClientError(f"Erreur client HTTP {response.status_code}: {response.text}")
 
                 # Statuts 5xx : retry possible
                 logger.warning(
                     "Erreur serveur HTTP %s, tentative de retry...",
                     response.status_code,
                 )
-                last_exc = APIClientError(
-                    f"Erreur serveur HTTP {response.status_code}: {response.text}"
-                )
+                last_exc = APIClientError(f"Erreur serveur HTTP {response.status_code}: {response.text}")
 
             except (requests.Timeout, requests.ConnectionError, requests.RequestException) as exc:
                 logger.warning(

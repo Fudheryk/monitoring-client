@@ -1,8 +1,8 @@
 # src/collectors/builtin/scheduled_tasks.py
 
+import logging
 import os
 import subprocess
-import logging
 
 from collectors.base_collector import BaseCollector
 
@@ -23,8 +23,7 @@ class ScheduledTasksCollector(BaseCollector):
         metrics = []
 
         # Cron disponible ?
-        cron_active = os.path.exists(
-            "/etc/cron.d") or os.path.exists("/var/spool/cron")
+        cron_active = os.path.exists("/etc/cron.d") or os.path.exists("/var/spool/cron")
 
         # Nombre de jobs cron (dans /etc/crontab uniquement, comme le
         # prototype)
@@ -32,11 +31,11 @@ class ScheduledTasksCollector(BaseCollector):
         if os.path.exists("/etc/crontab"):
             try:
                 with open("/etc/crontab", "r", encoding="utf-8", errors="ignore") as f:
-                    cron_jobs = len([line for line in f.readlines(
-                    ) if line.strip() and not line.lstrip().startswith("#")])
+                    cron_jobs = len(
+                        [line for line in f.readlines() if line.strip() and not line.lstrip().startswith("#")]
+                    )
             except Exception as exc:  # pragma: no cover - log only
-                logger.warning(
-                    "Erreur lors de la lecture de /etc/crontab : %s", exc)
+                logger.warning("Erreur lors de la lecture de /etc/crontab : %s", exc)
 
         # Anacron disponible ?
         anacron_active = os.path.exists("/usr/sbin/anacron")
@@ -56,34 +55,39 @@ class ScheduledTasksCollector(BaseCollector):
             if len(lines) > 1:
                 timers_count = len([l for l in lines[1:] if l.strip()])
         except Exception as exc:  # pragma: no cover - log only
-            logger.warning(
-                "Erreur lors de la récupération des timers systemd : %s", exc
-            )
+            logger.warning("Erreur lors de la récupération des timers systemd : %s", exc)
 
-        metrics.extend([{"name": "scheduled_tasks.cron.available",
-                         "value": bool(cron_active),
-                         "type": "boolean",
-                         "description": "Indique si le service cron est disponible",
-                         "is_critical": False,
-                         },
-                        {"name": "scheduled_tasks.cron.jobs_count",
-                         "value": int(cron_jobs),
-                         "type": "numeric",
-                         "description": "Nombre de tâches cron programmées (via /etc/crontab)",
-                         "is_critical": False,
-                         },
-                        {"name": "scheduled_tasks.anacron.available",
-                         "value": bool(anacron_active),
-                         "type": "boolean",
-                         "description": "Indique si le service Anacron est disponible",
-                         "is_critical": False,
-                         },
-                        {"name": "scheduled_tasks.systemd_timers.count",
-                         "value": int(timers_count),
-                         "type": "numeric",
-                         "description": "Nombre de timers systemd (tous états confondus)",
-                         "is_critical": False,
-                         },
-                        ])
+        metrics.extend(
+            [
+                {
+                    "name": "scheduled_tasks.cron.available",
+                    "value": bool(cron_active),
+                    "type": "boolean",
+                    "description": "Indique si le service cron est disponible",
+                    "is_critical": False,
+                },
+                {
+                    "name": "scheduled_tasks.cron.jobs_count",
+                    "value": int(cron_jobs),
+                    "type": "numeric",
+                    "description": "Nombre de tâches cron programmées (via /etc/crontab)",
+                    "is_critical": False,
+                },
+                {
+                    "name": "scheduled_tasks.anacron.available",
+                    "value": bool(anacron_active),
+                    "type": "boolean",
+                    "description": "Indique si le service Anacron est disponible",
+                    "is_critical": False,
+                },
+                {
+                    "name": "scheduled_tasks.systemd_timers.count",
+                    "value": int(timers_count),
+                    "type": "numeric",
+                    "description": "Nombre de timers systemd (tous états confondus)",
+                    "is_critical": False,
+                },
+            ]
+        )
 
         return metrics
