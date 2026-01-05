@@ -7,21 +7,18 @@ set -euo pipefail
 # Produit :
 #   rpmbuild/RPMS/x86_64/monitoring-client-<version>-1.x86_64.rpm
 #
-# Améliorations :
-#   - Vérification version systemd
-#   - Logging complet des opérations
-#   - Validation de la configuration
-#   - Sécurisation renforcée
-#   - Gestion des dépendances
-#   - Auto-vérification des prérequis
-#   - Support YUM/DNF pour installation des dépendances
+# Améliorations par rapport à la version précédente :
+#   - Structure /opt/monitoring-client/ complète (config/, data/, vendors/)
+#   - Préservation des données lors des mises à jour
+#   - Installation de config.schema.json
+#   - Gestion %config(noreplace) pour préserver les fichiers utilisateur
+#   - Scripts %post/%preun/%postun améliorés
 # -----------------------------------------------------------------------------
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${PROJECT_ROOT}/dist"
 RELEASE_DIR="${PROJECT_ROOT}/release"
 LOG_FILE="${PROJECT_ROOT}/build-rpm.log"
-
 BINARY_NAME="monitoring-client"
 
 # Initialisation du logging
@@ -35,62 +32,62 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # -----------------------------------------------------------------------------
 function check_prerequisites() {
   echo "[check] Vérification des prérequis..."
-  
+
   # Vérifier systemctl
   if ! command -v systemctl &> /dev/null; then
     echo "❌ systemd n'est pas installé. L'installation ne peut pas continuer."
     exit 1
   fi
-  
+
   # Vérifier rpmbuild
   if ! command -v rpmbuild &> /dev/null; then
     echo "❌ rpmbuild n'est pas installé."
     echo "   Installez-le avec : sudo yum install rpm-build"
-    echo "                  ou : sudo dnf install rpm-build"
     exit 1
   fi
-  
+
   echo "[check] ✓ rpmbuild détecté"
-  
-  # Vérifier la version de systemd (minimum 226)
+
+  # Vérifier la version de systemd (minimum 200)
   SYSTEMD_VERSION=$(systemctl --version | head -n 1 | awk '{print $2}')
-  if [[ "${SYSTEMD_VERSION}" -lt 226 ]]; then
+  if [[ "${SYSTEMD_VERSION}" -lt 200 ]]; then
     echo "❌ Votre version de systemd (${SYSTEMD_VERSION}) est obsolète."
-    echo "   Version minimale requise : 226"
-    echo "   Veuillez mettre à jour systemd."
+    echo "   Version minimale requise : 200"
     exit 1
   fi
-  
+
   echo "[check] ✓ systemd version ${SYSTEMD_VERSION} détecté"
-  
-  # Vérifier Python 3 (pour le build PyInstaller)
-  if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 n'est pas installé. Impossible de builder le binaire."
-    echo "   Installez-le avec : sudo yum install python3"
-    echo "                  ou : sudo dnf install python3"
+
+  # Vérifier Python 3 (ou le Python compilé)
+  if ! command -v python3 &> /dev/null && ! command -v /opt/python311/bin/python3.11 &> /dev/null; then
+    echo "❌ Python 3 n'est pas installé."
     exit 1
   fi
-  
-  echo "[check] ✓ Python 3 détecté : $(python3 --version)"
-  
+
+  echo "[check] ✓ Python 3 détecté"
+
   # Vérifier PyInstaller
-  if ! python3 -m pip show pyinstaller &> /dev/null; then
+  PYTHON_CMD="${PYTHON_CMD:-python3}"
+  if [[ -x /opt/python311/bin/python3.11 ]]; then
+    PYTHON_CMD="/opt/python311/bin/python3.11"
+  fi
+
+  if ! ${PYTHON_CMD} -m pip show pyinstaller &> /dev/null; then
     echo "⚠️  PyInstaller n'est pas installé. Tentative d'installation..."
-    python3 -m pip install pyinstaller || {
+    ${PYTHON_CMD} -m pip install pyinstaller || {
       echo "❌ Impossible d'installer PyInstaller."
-      echo "   Installez-le manuellement : pip3 install pyinstaller"
       exit 1
     }
   fi
-  
+
   echo "[check] ✓ PyInstaller détecté"
-  
-  # Vérifier tar (nécessaire pour créer Source0)
+
+  # Vérifier tar
   if ! command -v tar &> /dev/null; then
     echo "❌ tar n'est pas installé."
     exit 1
   fi
-  
+
   echo "[check] ✓ tar détecté"
   echo "[check] ✓ Tous les prérequis sont satisfaits"
 }
@@ -104,12 +101,11 @@ check_prerequisites
 # Configuration du package
 # -----------------------------------------------------------------------------
 
-# Récupère la version depuis config/config.yaml
+# Récupère la version depuis src/__version__.py
 VERSION="$(
-  grep -E '^[[:space:]]*version:' "${PROJECT_ROOT}/config/config.yaml" \
+  grep -E '^__version__' "${PROJECT_ROOT}/src/__version__.py" \
     | head -1 \
-    | awk '{print $2}' \
-    | tr -d '"'
+    | cut -d'"' -f2
 )"
 
 VERSION="${VERSION:-1.0.0}"
@@ -181,7 +177,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 User=root
-ExecStart=/usr/local/bin/monitoring-client --config /etc/monitoring-client/config.yaml
+ExecStart=/usr/local/bin/monitoring-client --config /opt/monitoring-client/config/config.yaml
 WorkingDirectory=/opt/monitoring-client
 StandardOutput=journal
 StandardError=journal
@@ -219,6 +215,9 @@ echo "[rpm] ✓ Fichiers systemd créés"
 # -----------------------------------------------------------------------------
 # Préparation de la configuration
 # -----------------------------------------------------------------------------
+echo "[rpm] Préparation des fichiers de configuration..."
+
+# Vérifier config.yaml.example
 if [[ ! -f "${PROJECT_ROOT}/config/config.yaml.example" ]]; then
   echo "⚠️  Fichier config.yaml.example introuvable. Création d'un fichier par défaut..."
   mkdir -p "${PROJECT_ROOT}/config"
@@ -238,6 +237,38 @@ collectors:
 YAML
 fi
 
+# Vérifier config.schema.json
+if [[ ! -f "${PROJECT_ROOT}/config/config.schema.json" ]]; then
+  echo "⚠️  Fichier config.schema.json introuvable. Création d'un fichier par défaut..."
+  cat > "${PROJECT_ROOT}/config/config.schema.json" <<'JSON'
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["api"],
+  "properties": {
+    "api": {
+      "type": "object",
+      "required": ["base_url", "metrics_endpoint"],
+      "properties": {
+        "base_url": {"type": "string"},
+        "metrics_endpoint": {"type": "string"},
+        "timeout": {"type": "integer"}
+      }
+    },
+    "collectors": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    }
+  }
+}
+JSON
+fi
+
 echo "[rpm] ✓ Configuration préparée"
 
 # -----------------------------------------------------------------------------
@@ -245,7 +276,7 @@ echo "[rpm] ✓ Configuration préparée"
 # -----------------------------------------------------------------------------
 echo "[rpm] Génération du fichier SPEC..."
 
-# ✅ CORRECTION 1 : Générer la date en anglais pour le changelog
+# Générer la date en anglais pour le changelog
 CHANGELOG_DATE=$(LC_TIME=C date '+%a %b %d %Y')
 
 cat > "${RPMROOT}/SPECS/monitoring-client.spec" <<EOF
@@ -257,7 +288,7 @@ License:        Proprietary
 Group:          Applications/System
 Source0:        monitoring-client-${VERSION}.tar.gz
 BuildArch:      x86_64
-Requires:       systemd >= 226
+Requires:       systemd >= 200
 
 %description
 Collecte et envoie des métriques système, réseau, sécurité
@@ -272,7 +303,7 @@ Fonctionnalités principales :
  - Sécurisation renforcée (ProtectSystem, NoNewPrivileges)
 
 Prérequis système :
- - systemd >= 226
+ - systemd >= 200
  - Architecture : x86_64
 
 %prep
@@ -282,39 +313,84 @@ Prérequis système :
 # Aucune étape de build : binaire pre-build
 
 %install
+# ============================================================================
 # Installation du binaire dans /usr/local/bin
+# ============================================================================
 mkdir -p %{buildroot}/usr/local/bin
 cp -a %{_sourcedir}/../../dist/monitoring-client %{buildroot}/usr/local/bin/monitoring-client
 chmod 755 %{buildroot}/usr/local/bin/monitoring-client
 
-# Configuration par défaut dans /etc/monitoring-client/config.yaml
-mkdir -p %{buildroot}/etc/monitoring-client
-install -m 644 ${PROJECT_ROOT}/config/config.yaml.example %{buildroot}/etc/monitoring-client/config.yaml
-
-# ✅ CORRECTION 2 : Créer les répertoires séparément (pas d'accolades)
-mkdir -p %{buildroot}/opt/monitoring-client
+# ============================================================================
+# Structure /opt/monitoring-client/ (comme Debian)
+# Créer TOUS les répertoires d'abord
+# ============================================================================
+mkdir -p %{buildroot}/opt/monitoring-client/config
 mkdir -p %{buildroot}/opt/monitoring-client/data
 mkdir -p %{buildroot}/opt/monitoring-client/vendors
+
+# ============================================================================
+# Installer les fichiers de configuration dans /opt/monitoring-client/config/
+# ============================================================================
+install -m 644 ${PROJECT_ROOT}/config/config.yaml.example %{buildroot}/opt/monitoring-client/config/config.yaml
+install -m 644 ${PROJECT_ROOT}/config/config.yaml.example %{buildroot}/opt/monitoring-client/config/config.yaml.example
+install -m 644 ${PROJECT_ROOT}/config/config.schema.json %{buildroot}/opt/monitoring-client/config/config.schema.json
+
+# ============================================================================
+# Répertoires de logs et cache
+# ============================================================================
 mkdir -p %{buildroot}/var/log/monitoring-client
 mkdir -p %{buildroot}/var/cache/monitoring-client
 
+# ============================================================================
 # Unités systemd (service + timer)
+# ============================================================================
 mkdir -p %{buildroot}/usr/lib/systemd/system
 install -m 644 ${PROJECT_ROOT}/release/systemd/monitoring-client.service %{buildroot}/usr/lib/systemd/system/monitoring-client.service
 install -m 644 ${PROJECT_ROOT}/release/systemd/monitoring-client.timer %{buildroot}/usr/lib/systemd/system/monitoring-client.timer
 
 %files
+# ============================================================================
+# Binaire principal
+# ============================================================================
 /usr/local/bin/monitoring-client
-%config(noreplace) /etc/monitoring-client/config.yaml
+
+# ============================================================================
+# Configuration (préservée lors des mises à jour avec noreplace)
+# ============================================================================
+%config(noreplace) /opt/monitoring-client/config/config.yaml
+
+# ============================================================================
+# Unités systemd
+# ============================================================================
 /usr/lib/systemd/system/monitoring-client.service
 /usr/lib/systemd/system/monitoring-client.timer
+
+# ============================================================================
+# Structure /opt/monitoring-client/
+# Les répertoires data/ et vendors/ sont marqués pour préservation
+# ============================================================================
 %dir /opt/monitoring-client
+%dir /opt/monitoring-client/config
 %dir /opt/monitoring-client/data
 %dir /opt/monitoring-client/vendors
+
+# Fichiers de configuration dans /opt/monitoring-client/config/
+# (noreplace pour préserver les modifications)
+%config(noreplace) /opt/monitoring-client/config/config.yaml.example
+%config(noreplace) /opt/monitoring-client/config/config.schema.json
+
+# ============================================================================
+# Répertoires de logs et cache
+# ============================================================================
 %dir /var/log/monitoring-client
 %dir /var/cache/monitoring-client
 
 %post
+# ============================================================================
+# Script post-installation
+# Exécuté après l'installation des fichiers
+# ============================================================================
+
 # Fonction de logging
 log() {
   echo "[\$0] \$1" | tee -a /var/log/monitoring-client-install.log
@@ -324,15 +400,26 @@ log ""
 log "=== Configuration de Monitoring Client ==="
 log ""
 
+# ============================================================================
 # Créer les répertoires nécessaires (si pas déjà présents)
+# ============================================================================
+mkdir -p /opt/monitoring-client/config
 mkdir -p /opt/monitoring-client/data
 mkdir -p /opt/monitoring-client/vendors
 mkdir -p /var/log/monitoring-client
 mkdir -p /var/cache/monitoring-client
 
+# ============================================================================
 # Permissions strictes
+# ============================================================================
 chmod 755 /usr/local/bin/monitoring-client
-chmod 644 /etc/monitoring-client/config.yaml
+
+# Vérifier existence avant chmod (éviter les erreurs)
+if [[ -f /etc/monitoring-client/config/config.yaml ]]; then
+  chmod 644 /etc/monitoring-client/config/config.yaml
+fi
+
+chmod 755 /opt/monitoring-client/config
 chmod 755 /opt/monitoring-client/data
 chmod 755 /opt/monitoring-client/vendors
 chmod 755 /var/log/monitoring-client
@@ -340,28 +427,42 @@ chmod 755 /var/cache/monitoring-client
 
 log "✓ Répertoires et permissions configurés"
 
+# ============================================================================
 # Validation de la configuration
-if ! grep -q 'base_url' /etc/monitoring-client/config.yaml; then
-  log "⚠️  Le fichier de configuration ne contient pas 'base_url'."
-  log "   Veuillez le configurer manuellement."
+# ============================================================================
+if [[ -f /opt/monitoring-client/config/config.yaml ]]; then
+  if ! grep -q 'base_url' /opt/monitoring-client/config/config.yaml; then
+    log "⚠️  Le fichier de configuration ne contient pas 'base_url'."
+    log "   Veuillez le configurer manuellement."
+  fi
+else
+  log "⚠️  Fichier config.yaml manquant dans /opt/monitoring-client/config/"
 fi
 
+# ============================================================================
 # Recharger systemd
+# ============================================================================
 if command -v systemctl >/dev/null 2>&1; then
   systemctl daemon-reload || true
   log "✓ systemd rechargé"
 fi
 
+# ============================================================================
+# Gestion du timer selon le contexte (nouvelle installation vs mise à jour)
+# ============================================================================
+
 # Vérifier si l'API key existe déjà
-if [[ -f /etc/monitoring-client/api_key && -s /etc/monitoring-client/api_key ]]; then
+if [[ -f /opt/monitoring-client/data/api_key && -s /opt/monitoring-client/data/api_key ]]; then
   # Sécuriser la clé API
-  chmod 600 /etc/monitoring-client/api_key
+  chmod 600 /opt/monitoring-client/data/api_key
   log "✓ Clé API détectée et sécurisée (chmod 600)"
-  
-  # Vérifier si c'est une mise à jour
-  if rpm -q monitoring-client >/dev/null 2>&1; then
+
+  # Vérifier si c'est une mise à jour (le package était déjà installé)
+  # \$1 = 1 signifie nouvelle installation
+  # \$1 = 2 signifie mise à jour
+  if [[ "\$1" -ge 2 ]]; then
     log "✓ Mise à jour détectée"
-    
+
     # Redémarrer le timer si déjà actif
     if systemctl is-active --quiet monitoring-client.timer 2>/dev/null; then
       systemctl restart monitoring-client.timer || true
@@ -371,23 +472,24 @@ if [[ -f /etc/monitoring-client/api_key && -s /etc/monitoring-client/api_key ]];
       log "✓ Timer activé et démarré"
     fi
   else
-    # Nouvelle installation
+    # Nouvelle installation (\$1 = 1)
+    log "✓ Nouvelle installation détectée"
     systemctl enable --now monitoring-client.timer >/dev/null 2>&1 || true
     log "✓ Timer activé et démarré (nouvelle installation)"
   fi
 else
-  log "⚠️  Aucune clé API trouvée."
+  log "⚠️  Aucune clé API trouvée dans /opt/monitoring-client/data/api_key"
   log ""
   log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   log "📋 Étapes suivantes (OBLIGATOIRES)"
   log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   log ""
   log "  1️⃣  Ajouter votre clé API :"
-  log "      echo 'VOTRE_CLE_API' | sudo tee /etc/monitoring-client/api_key"
-  log "      sudo chmod 600 /etc/monitoring-client/api_key"
+  log "      echo 'VOTRE_CLE_API' | sudo tee /opt/monitoring-client/data/api_key"
+  log "      sudo chmod 600 /opt/monitoring-client/data/api_key"
   log ""
   log "  2️⃣  Configurer le serveur backend :"
-  log "      sudo vi /etc/monitoring-client/config.yaml"
+  log "      sudo vi /etc/monitoring-client/config/config.yaml"
   log "      (Modifier 'base_url' et 'metrics_endpoint')"
   log ""
   log "  3️⃣  Activer et démarrer le timer :"
@@ -411,6 +513,11 @@ log "📁 Log complet : /var/log/monitoring-client-install.log"
 exit 0
 
 %preun
+# ============================================================================
+# Script pré-désinstallation
+# Exécuté AVANT la suppression des fichiers
+# ============================================================================
+
 # Fonction de logging
 log() {
   echo "[\$0] \$1" | tee -a /var/log/monitoring-client-install.log
@@ -421,34 +528,37 @@ log "━━━━━━━━━━━━━━━━━━━━━━━━━
 log "Arrêt du service monitoring-client..."
 log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# \$1 contient le nombre d'instances restantes après cette opération
-# 0 = suppression complète
-# 1 = mise à jour (une nouvelle version va être installée)
+# ============================================================================
+# Gestion selon le contexte
+# \$1 = 0 signifie suppression complète (erase)
+# \$1 = 1 signifie mise à jour (upgrade) - une nouvelle version va être installée
+# ============================================================================
 
 if [[ "\$1" -eq 0 ]]; then
   log "Action détectée : suppression complète"
-  
+
   # Arrêter le timer
   if systemctl is-active --quiet monitoring-client.timer 2>/dev/null; then
     systemctl stop monitoring-client.timer || true
     log "✓ Timer arrêté"
   fi
-  
+
   # Désactiver le timer
   if systemctl is-enabled --quiet monitoring-client.timer 2>/dev/null; then
     systemctl disable monitoring-client.timer || true
     log "✓ Timer désactivé"
   fi
-  
+
   # Arrêter le service s'il tourne
   if systemctl is-active --quiet monitoring-client.service 2>/dev/null; then
     systemctl stop monitoring-client.service || true
     log "✓ Service arrêté"
   fi
 else
-  log "Action détectée : mise à jour (conservation du timer)"
-  
+  log "Action détectée : mise à jour (préservation du timer)"
+
   # En mise à jour, on arrête juste le timer temporairement
+  # Il sera redémarré par le %post de la nouvelle version
   if systemctl is-active --quiet monitoring-client.timer 2>/dev/null; then
     systemctl stop monitoring-client.timer || true
     log "✓ Timer arrêté temporairement pour mise à jour"
@@ -460,45 +570,74 @@ log "✓ Pré-suppression terminée"
 exit 0
 
 %postun
+# ============================================================================
+# Script post-désinstallation
+# Exécuté APRÈS la suppression des fichiers
+# ============================================================================
+
 # Fonction de logging
 log() {
   echo "[\$0] \$1" | tee -a /var/log/monitoring-client-install.log
 }
 
-# \$1 = 0 signifie suppression complète (pas de mise à jour)
+# ============================================================================
+# Gestion selon le contexte
+# \$1 = 0 signifie suppression complète (erase)
+# \$1 = 1 signifie mise à jour (upgrade)
+# ============================================================================
+
 if [[ "\$1" -eq 0 ]]; then
   log ""
   log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  log "Nettoyage post-suppression"
+  log "Nettoyage post-suppression (action: erase)"
   log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  
-  # Suppression complète des fichiers et répertoires
-  rm -rf /opt/monitoring-client/data
-  rm -rf /opt/monitoring-client/vendors
-  rm -rf /var/log/monitoring-client
+
+  # ============================================================================
+  # Suppression complète SEULEMENT DES CACHES et LOGS
+  # PRÉSERVATION de /opt/monitoring-client/data/ et /opt/monitoring-client/vendors/
+  # ============================================================================
+
+  # Supprimer UNIQUEMENT le cache (non critique)
   rm -rf /var/cache/monitoring-client
-  rm -rf /etc/monitoring-client
-  
-  # Si /opt/monitoring-client est vide, le supprimer aussi
-  if [[ -d /opt/monitoring-client ]] && [[ -z "\$(ls -A /opt/monitoring-client)" ]]; then
-    rmdir /opt/monitoring-client
-    log "✓ Répertoire /opt/monitoring-client supprimé (vide)"
-  fi
-  
-  # Recharger systemd après suppression des fichiers
+  log "✓ Cache supprimé"
+
+  # Supprimer les logs (optionnel - peut être préservé)
+  # rm -rf /var/log/monitoring-client
+  # log "✓ Logs supprimés"
+
+  # ============================================================================
+  # PRÉSERVATION DES DONNÉES UTILISATEUR
+  # ============================================================================
+  # On NE supprime PAS :
+  # - /opt/monitoring-client/data/api_key
+  # - /opt/monitoring-client/data/fingerprint
+  # - /opt/monitoring-client/vendors/* (scripts custom)
+  # - /etc/monitoring-client/config/config.yaml (déjà géré par %config(noreplace))
+
+  log "✓ Données préservées dans /opt/monitoring-client/data/"
+  log "✓ Vendors préservés dans /opt/monitoring-client/vendors/"
+  log "✓ Configuration préservée dans /etc/monitoring-client/"
+
+  # Recharger systemd après suppression des fichiers service
   if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload 2>/dev/null || true
     log "✓ systemd rechargé"
   fi
-  
-  log ""
-  log "✓ Monitoring Client désinstallé complètement"
+
   log ""
   log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  log "   Suppression complète effectuée."
-  log "   Log final : /var/log/monitoring-client-install.log"
+  log "✓ Monitoring Client désinstallé"
+  log "ℹ️  Données préservées pour réinstallation ultérieure"
+  log ""
+  log "Pour supprimer TOUTES les données manuellement :"
+  log "  sudo rm -rf /opt/monitoring-client"
+  log "  sudo rm -rf /etc/monitoring-client"
+  log "  sudo rm -rf /var/log/monitoring-client"
   log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   log ""
+else
+  # \$1 = 1 signifie mise à jour - NE RIEN SUPPRIMER
+  log "Action détectée : mise à jour - préservation de toutes les données"
 fi
 
 exit 0
@@ -506,7 +645,9 @@ exit 0
 %changelog
 * ${CHANGELOG_DATE} Frederic GIL GARCIA <frederic.gilgarcia@gmail.com> - ${VERSION}-1
 - Version ${VERSION}
-- Build automatique avec amélioration de sécurité et logging
+- Structure /opt/monitoring-client/ complète (config/, data/, vendors/)
+- Préservation des données lors des mises à jour
+- Build automatique avec Python 3.11 sur CentOS 7
 
 EOF
 
@@ -559,14 +700,9 @@ echo ""
 echo "  Vérification du contenu :"
 echo "    rpm -qlp ${RPM_OUTPUT}"
 echo ""
-echo "  Informations du package :"
-echo "    rpm -qip ${RPM_OUTPUT}"
-echo ""
-echo "  Vérification de l'installation :"
-echo "    rpm -qa | grep monitoring-client"
-echo ""
-echo "  Vérification des scripts :"
-echo "    rpm -q --scripts monitoring-client"
+echo "  Vérification de la structure installée :"
+echo "    tree /opt/monitoring-client/"
+echo "    tree /etc/monitoring-client/"
 echo ""
 echo "  Test du binaire :"
 echo "    /usr/local/bin/monitoring-client --version"

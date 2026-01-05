@@ -12,7 +12,7 @@ echo "[1/4] Build binaire (PyInstaller)"
 echo "[2/4] Build TAR.GZ package"
 "${SCRIPTS}/package.sh"
 
-echo "[3/4] Build DEB"
+#echo "[3/4] Build DEB"
 "${SCRIPTS}/deb_build.sh"
 
 echo "[4/4] Build RPM"

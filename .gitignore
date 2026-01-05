@@ -97,3 +97,11 @@ release/
 
 # Ignorer les fichiers de cache générés par les tests (pytest)
 *.pytest_cache/
+
+
+# 12. Fichiers du projet
+# ---------------------------------------------
+
+# Ignore les fichiers sensibles
+data/api_key
+data/fingerprint

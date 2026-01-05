@@ -45,6 +45,7 @@ if [ -f README.md ]; then
     echo "✓ README.md"
 fi
 
+
 echo ""
 echo "✅ Version synchronisée vers ${NEW_VERSION}"
 echo ""
