@@ -140,7 +140,7 @@ class SecurityCollector(BaseCollector):
         metrics.extend(
             [
                 {
-                    "name": "security.logged_users",
+                    "name": "logged_users",
                     "value": int(users_count),
                     "type": "numeric",
                     "description": "Nombre d'utilisateurs connectés au système.",
@@ -149,7 +149,7 @@ class SecurityCollector(BaseCollector):
                     "editor_name": self.editor,  # Type de collecteur
                 },
                 {
-                    "name": "security.ssh_connections",
+                    "name": "ssh_connections",
                     "value": int(ssh_connections),
                     "type": "numeric",
                     "description": "Nombre de connexions SSH actives.",
@@ -158,7 +158,7 @@ class SecurityCollector(BaseCollector):
                     "editor_name": self.editor,  # Type de collecteur
                 },
                 {
-                    "name": "security.suspicious_processes",
+                    "name": "suspicious_processes",
                     "value": int(suspicious_processes),
                     "type": "numeric",
                     "description": "Nombre de processus suspects détectés.",
@@ -167,7 +167,7 @@ class SecurityCollector(BaseCollector):
                     "editor_name": self.editor,  # Type de collecteur
                 },
                 {
-                    "name": "security.high_cpu_processes",
+                    "name": "high_cpu_processes",
                     "value": int(high_cpu_processes),
                     "type": "numeric",
                     "description": "Nombre de processus consommant plus de 80% de CPU.",
@@ -176,7 +176,7 @@ class SecurityCollector(BaseCollector):
                     "editor_name": self.editor,  # Type de collecteur
                 },
                 {
-                    "name": "security.open_ports_count",
+                    "name": "open_ports_count",
                     "value": int(len(open_ports)),
                     "type": "numeric",
                     "description": "Nombre de ports ouverts (LISTEN) sur le système.",
@@ -185,7 +185,7 @@ class SecurityCollector(BaseCollector):
                     "editor_name": self.editor,  # Type de collecteur
                 },
                 {
-                    "name": "security.sshd_version",
+                    "name": "sshd_version",
                     "value": ssh_version,
                     "type": "string",
                     "description": "Version actuelle de SSH (sshd) sur le système.",

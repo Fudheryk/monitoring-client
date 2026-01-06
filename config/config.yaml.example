@@ -3,8 +3,8 @@
 client:
   # Used in metadata.generator
   name: "monitoring-client"
-  version: "1.0.43"
-  schema_version: "1.0.43"
+  version: "1.0.44"
+  schema_version: "1.0.44"
 
 api:
   # Base URL of the monitoring server (no trailing slash)

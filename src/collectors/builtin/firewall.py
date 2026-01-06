@@ -21,12 +21,12 @@ class FirewallCollector(BaseCollector):
       - firewalld
 
     Noms de métriques (exemples) :
-      - firewall.ufw.enabled (boolean)
-      - firewall.ufw.version (string)
-      - firewall.iptables.rules_count (numeric)
-      - firewall.iptables.version (string)
-      - firewall.firewalld.running (boolean)
-      - firewall.firewalld.version (string)
+      - ufw.enabled (boolean)
+      - ufw.version (string)
+      - iptables.rules_count (numeric)
+      - iptables.version (string)
+      - firewalld.running (boolean)
+      - firewalld.version (string)
     """
 
     name = "firewall"  # Nom du collecteur
@@ -73,7 +73,7 @@ class FirewallCollector(BaseCollector):
             enabled = "Status: active" in result.stdout
             m.append(
                 {
-                    "name": "firewall.ufw.enabled",
+                    "name": "ufw.enabled",
                     "value": enabled,
                     "type": "boolean",
                     "collector_name": self.name,  # Nom du collecteur
@@ -81,7 +81,7 @@ class FirewallCollector(BaseCollector):
                 }
             )
         except Exception as exc:
-            logger.debug("Échec de la collecte firewall.ufw.enabled: %s", exc)
+            logger.debug("Échec de la collecte ufw.enabled: %s", exc)
 
         # Version UFW
         try:
@@ -95,7 +95,7 @@ class FirewallCollector(BaseCollector):
             version = result.stdout.strip() if result.returncode == 0 else "unknown"
             m.append(
                 {
-                    "name": "firewall.ufw.version",
+                    "name": "ufw.version",
                     "value": version,
                     "type": "string",
                     "collector_name": self.name,  # Nom du collecteur
@@ -103,7 +103,7 @@ class FirewallCollector(BaseCollector):
                 }
             )
         except Exception as exc:
-            logger.debug("Échec de la collecte firewall.ufw.version: %s", exc)
+            logger.debug("Échec de la collecte ufw.version: %s", exc)
 
         return m
 
@@ -137,7 +137,7 @@ class FirewallCollector(BaseCollector):
                 )
                 m.append(
                     {
-                        "name": "firewall.iptables.rules_count",
+                        "name": "iptables.rules_count",
                         "value": rules_count,
                         "type": "numeric",
                         "collector_name": self.name,  # Nom du collecteur
@@ -145,7 +145,7 @@ class FirewallCollector(BaseCollector):
                     }
                 )
         except Exception as exc:
-            logger.debug("Échec de la collecte firewall.iptables.rules_count: %s", exc)
+            logger.debug("Échec de la collecte iptables.rules_count: %s", exc)
 
         # Version iptables
         try:
@@ -159,7 +159,7 @@ class FirewallCollector(BaseCollector):
             version = result.stdout.strip() if result.returncode == 0 else "unknown"
             m.append(
                 {
-                    "name": "firewall.iptables.version",
+                    "name": "iptables.version",
                     "value": version,
                     "type": "string",
                     "collector_name": self.name,  # Nom du collecteur
@@ -167,7 +167,7 @@ class FirewallCollector(BaseCollector):
                 }
             )
         except Exception as exc:
-            logger.debug("Échec de la collecte firewall.iptables.version: %s", exc)
+            logger.debug("Échec de la collecte iptables.version: %s", exc)
 
         return m
 
@@ -194,7 +194,7 @@ class FirewallCollector(BaseCollector):
             running = "running" in result.stdout
             m.append(
                 {
-                    "name": "firewall.firewalld.running",
+                    "name": "firewalld.running",
                     "value": running,
                     "type": "boolean",
                     "collector_name": self.name,  # Nom du collecteur
@@ -202,7 +202,7 @@ class FirewallCollector(BaseCollector):
                 }
             )
         except Exception as exc:
-            logger.debug("Échec de la collecte firewall.firewalld.running: %s", exc)
+            logger.debug("Échec de la collecte firewalld.running: %s", exc)
 
         # Version firewalld
         try:
@@ -216,7 +216,7 @@ class FirewallCollector(BaseCollector):
             version = result.stdout.strip() if result.returncode == 0 else "unknown"
             m.append(
                 {
-                    "name": "firewall.firewalld.version",
+                    "name": "firewalld.version",
                     "value": version,
                     "type": "string",
                     "collector_name": self.name,  # Nom du collecteur
@@ -224,7 +224,7 @@ class FirewallCollector(BaseCollector):
                 }
             )
         except Exception as exc:
-            logger.debug("Échec de la collecte firewall.firewalld.version: %s", exc)
+            logger.debug("Échec de la collecte firewalld.version: %s", exc)
 
         return m
 

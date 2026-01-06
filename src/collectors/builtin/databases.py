@@ -37,7 +37,7 @@ class DatabasesCollector(BaseCollector):
             mysql_active = self._systemd_is_active("mysql")
             metrics.append(
                 {
-                    "name": "database.mysql.service_active",
+                    "name": "mysql.service_active",
                     "value": bool(mysql_active),
                     "type": "boolean",
                     "description": (
@@ -55,7 +55,7 @@ class DatabasesCollector(BaseCollector):
             mariadb_active = self._systemd_is_active("mariadb")
             metrics.append(
                 {
-                    "name": "database.mariadb.service_active",
+                    "name": "mariadb.service_active",
                     "value": bool(mariadb_active),
                     "type": "boolean",
                     "description": (
@@ -73,7 +73,7 @@ class DatabasesCollector(BaseCollector):
             postgres_active = self._systemd_is_active("postgresql")
             metrics.append(
                 {
-                    "name": "database.postgresql.service_active",
+                    "name": "postgresql.service_active",
                     "value": bool(postgres_active),
                     "type": "boolean",
                     "description": (
@@ -92,7 +92,7 @@ class DatabasesCollector(BaseCollector):
             redis_active = self._systemd_is_active("redis")
             metrics.append(
                 {
-                    "name": "database.redis.service_active",
+                    "name": "redis.service_active",
                     "value": bool(redis_active),
                     "type": "boolean",
                     "description": (
