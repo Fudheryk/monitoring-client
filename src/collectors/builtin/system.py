@@ -399,6 +399,40 @@ class SystemCollector(BaseCollector):
         logger.info(f"Collecte terminée: {len(metrics)} métriques collectées.")
         return metrics
 
+    @staticmethod
+    def _is_bind_mount(mountpoint: str) -> bool:
+        """
+        Détecte un bind mount via /proc/self/mountinfo.
+        Fallback safe si non disponible.
+        """
+        try:
+            with open("/proc/self/mountinfo", "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) < 10:
+                        continue
+
+                    current_mount_point = parts[4]
+                    root_source = parts[3]
+
+                    if current_mount_point == mountpoint:
+                        # bind mount si root != /
+                        if root_source != "/":
+                            return True
+
+                        # ou option bind
+                        options = " ".join(parts[5:]).lower()
+                        if "bind" in options:
+                            return True
+
+        except (FileNotFoundError, PermissionError):
+            # Non Linux ou permissions
+            return False
+        except Exception:
+            return False
+
+        return False
+
     def _filter_and_deduplicate_partitions(self):
         """
         Filtrer les partitions valides et supprimer les doublons.
