@@ -1,13 +1,11 @@
-# src/collectors/builtin/databases.py
-
 import logging
 import os
 import subprocess
 
 from collectors.base_collector import BaseCollector
 
+# Configuration du logger
 logger = logging.getLogger(__name__)
-
 
 class DatabasesCollector(BaseCollector):
     """
@@ -17,19 +15,24 @@ class DatabasesCollector(BaseCollector):
     - Redis
     """
 
-    name = "databases"
+    name = "databases"  # Nom du collecteur
+    editor = "builtin"  # Type de collecteur
 
     def _collect_metrics(self):
+        """
+        Collecte les métriques relatives aux services de bases de données (MySQL, MariaDB, PostgreSQL, Redis)
+        :return: liste des métriques collectées
+        """
         metrics = []
 
-        # MySQL / MariaDB
+        # Vérification de la présence des binaires MySQL et MariaDB
         mysql_bin = "/usr/bin/mysql"
         mariadb_bin = "/usr/bin/mariadb"
 
         has_mysql = os.path.exists(mysql_bin)
         has_mariadb = os.path.exists(mariadb_bin)
 
-        # MySQL
+        # Collecte de la métrique pour MySQL
         if has_mysql:
             mysql_active = self._systemd_is_active("mysql")
             metrics.append(
@@ -42,10 +45,12 @@ class DatabasesCollector(BaseCollector):
                         "Critique car MySQL est essentiel pour la gestion des bases de données."
                     ),
                     "is_critical": True,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Nom de l'éditeur
                 }
             )
 
-        # MariaDB (si présent)
+        # Collecte de la métrique pour MariaDB (si présent)
         if has_mariadb:
             mariadb_active = self._systemd_is_active("mariadb")
             metrics.append(
@@ -58,10 +63,12 @@ class DatabasesCollector(BaseCollector):
                         "Critique car MariaDB est une alternative essentielle à MySQL."
                     ),
                     "is_critical": True,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Nom de l'éditeur
                 }
             )
 
-        # PostgreSQL
+        # Collecte de la métrique pour PostgreSQL
         if os.path.exists("/usr/bin/psql"):
             postgres_active = self._systemd_is_active("postgresql")
             metrics.append(
@@ -75,10 +82,12 @@ class DatabasesCollector(BaseCollector):
                         "couramment utilisée."
                     ),
                     "is_critical": True,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Nom de l'éditeur
                 }
             )
 
-        # Redis
+        # Collecte de la métrique pour Redis
         if os.path.exists("/usr/bin/redis-server"):
             redis_active = self._systemd_is_active("redis")
             metrics.append(
@@ -91,15 +100,21 @@ class DatabasesCollector(BaseCollector):
                         "Non critique mais important pour la mise en cache / données en mémoire."
                     ),
                     "is_critical": False,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Nom de l'éditeur
                 }
             )
 
+        # Retour des métriques collectées
+        logger.info(f"Collecte terminée: {len(metrics)} métriques collectées.")
         return metrics
 
     @staticmethod
     def _systemd_is_active(service_name: str) -> bool:
         """
         Retourne True si systemd considère le service comme 'active'.
+        :param service_name: nom du service à vérifier
+        :return: True si le service est actif, False sinon
         """
         try:
             result = subprocess.run(
@@ -110,7 +125,7 @@ class DatabasesCollector(BaseCollector):
                 check=False,
             )
             return result.stdout.strip() == "active"
-        except Exception as exc:  # pragma: no cover - log only
+        except Exception as exc:  # Si une erreur se produit lors de la vérification
             logger.warning(
                 "Erreur lors de la vérification de l'état systemd pour %s : %s",
                 service_name,

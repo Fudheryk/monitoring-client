@@ -1,13 +1,11 @@
-# src/collectors/builtin/docker.py
-
 import logging
 import os
 import subprocess
 
 from collectors.base_collector import BaseCollector
 
+# Configuration du logger
 logger = logging.getLogger(__name__)
-
 
 class DockerCollector(BaseCollector):
     """
@@ -17,17 +15,24 @@ class DockerCollector(BaseCollector):
     - nombre de conteneurs / images
     """
 
-    name = "docker"
+    name = "docker"  # Nom du collecteur
+    editor = "builtin"  # Type de collecteur
 
     def _collect_metrics(self):
+        """
+        Collecte les métriques liées à Docker (présence du binaire, état du démon, conteneurs, images).
+        :return: liste des métriques collectées
+        """
         metrics = []
 
+        # Vérification de la présence du binaire Docker
         docker_bin = "/usr/bin/docker"
         if not os.path.exists(docker_bin):
-            return metrics
+            return metrics  # Si Docker n'est pas installé, on retourne les métriques vides
 
         docker_running = False
         try:
+            # Vérification du statut du démon Docker
             result = subprocess.run(
                 [docker_bin, "info"],
                 stdout=subprocess.DEVNULL,
@@ -36,7 +41,7 @@ class DockerCollector(BaseCollector):
                 check=False,
             )
             docker_running = result.returncode == 0
-        except Exception as exc:  # pragma: no cover - log only
+        except Exception as exc:  # Si une erreur se produit
             logger.warning("Erreur lors de l'exécution de 'docker info' : %s", exc)
 
         # Statut du démon Docker
@@ -47,15 +52,17 @@ class DockerCollector(BaseCollector):
                 "type": "boolean",
                 "description": "Indique si le démon Docker est en cours d'exécution.",
                 "is_critical": True,
+                "collector_name": self.name,  # Nom du collecteur
+                "editor_name": self.editor,  # Nom de l'éditeur
             }
         )
 
         if not docker_running:
-            return metrics
+            return metrics  # Si le démon Docker n'est pas en cours d'exécution, on retourne les métriques ici
 
-        # Si le démon tourne, collecter des métriques supplémentaires
+        # Si le démon est en cours d'exécution, collecte des métriques supplémentaires
         try:
-            # Tous les conteneurs (y compris stoppés)
+            # Nombre total de conteneurs Docker (y compris stoppés)
             containers_result = subprocess.run(
                 [docker_bin, "ps", "-a", "--format", "{{.ID}}"],
                 stdout=subprocess.PIPE,
@@ -65,7 +72,7 @@ class DockerCollector(BaseCollector):
             )
             total_containers = len([l for l in containers_result.stdout.strip().split("\n") if l.strip()])
 
-            # Conteneurs en cours d'exécution
+            # Nombre de conteneurs Docker en cours d'exécution
             running_result = subprocess.run(
                 [docker_bin, "ps", "--format", "{{.ID}}"],
                 stdout=subprocess.PIPE,
@@ -75,7 +82,7 @@ class DockerCollector(BaseCollector):
             )
             running_containers = len([l for l in running_result.stdout.strip().split("\n") if l.strip()])
 
-            # Images Docker
+            # Nombre total d'images Docker sur le système
             images_result = subprocess.run(
                 [docker_bin, "images", "--format", "{{.ID}}"],
                 stdout=subprocess.PIPE,
@@ -85,7 +92,7 @@ class DockerCollector(BaseCollector):
             )
             total_images = len([l for l in images_result.stdout.strip().split("\n") if l.strip()])
 
-            # Conteneurs en pause
+            # Nombre de conteneurs Docker actuellement en pause
             paused_result = subprocess.run(
                 [docker_bin, "ps", "--filter", "status=paused", "--format", "{{.ID}}"],
                 stdout=subprocess.PIPE,
@@ -95,6 +102,7 @@ class DockerCollector(BaseCollector):
             )
             paused_containers = len([l for l in paused_result.stdout.strip().split("\n") if l.strip()])
 
+            # Ajout des métriques collectées
             metrics.extend(
                 [
                     {
@@ -103,6 +111,8 @@ class DockerCollector(BaseCollector):
                         "type": "numeric",
                         "description": "Nombre total de conteneurs Docker (y compris stoppés).",
                         "is_critical": True,
+                        "collector_name": self.name,  # Nom du collecteur
+                        "editor_name": self.editor,  # Nom de l'éditeur
                     },
                     {
                         "name": "docker.containers_running",
@@ -110,6 +120,8 @@ class DockerCollector(BaseCollector):
                         "type": "numeric",
                         "description": "Nombre de conteneurs Docker en cours d'exécution.",
                         "is_critical": True,
+                        "collector_name": self.name,  # Nom du collecteur
+                        "editor_name": self.editor,  # Nom de l'éditeur
                     },
                     {
                         "name": "docker.images_total",
@@ -117,6 +129,8 @@ class DockerCollector(BaseCollector):
                         "type": "numeric",
                         "description": "Nombre total d'images Docker sur le système.",
                         "is_critical": False,
+                        "collector_name": self.name,  # Nom du collecteur
+                        "editor_name": self.editor,  # Nom de l'éditeur
                     },
                     {
                         "name": "docker.containers_paused",
@@ -124,10 +138,14 @@ class DockerCollector(BaseCollector):
                         "type": "numeric",
                         "description": "Nombre de conteneurs Docker actuellement en pause.",
                         "is_critical": False,
+                        "collector_name": self.name,  # Nom du collecteur
+                        "editor_name": self.editor,  # Nom de l'éditeur
                     },
                 ]
             )
-        except Exception as exc:  # pragma: no cover - log only
+        except Exception as exc:  # Erreur lors de la collecte des métriques Docker
             logger.warning("Erreur lors de la collecte des métriques Docker : %s", exc)
 
+        # Retour des métriques collectées
+        logger.info(f"Collecte terminée: {len(metrics)} métriques collectées.")
         return metrics

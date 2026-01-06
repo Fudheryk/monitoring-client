@@ -1,13 +1,11 @@
-# src/collectors/builtin/scheduled_tasks.py
-
 import logging
 import os
 import subprocess
 
 from collectors.base_collector import BaseCollector
 
+# Configuration du logger
 logger = logging.getLogger(__name__)
-
 
 class ScheduledTasksCollector(BaseCollector):
     """
@@ -17,16 +15,20 @@ class ScheduledTasksCollector(BaseCollector):
     - nombre de timers systemd
     """
 
-    name = "scheduled_tasks"
+    name = "scheduled_tasks"  # Nom du collecteur
+    editor = "builtin"  # Type de collecteur
 
     def _collect_metrics(self):
+        """
+        Collecte les métriques liées aux tâches planifiées.
+        :return: Liste des métriques collectées.
+        """
         metrics = []
 
-        # Cron disponible ?
+        # Vérification de la disponibilité de cron
         cron_active = os.path.exists("/etc/cron.d") or os.path.exists("/var/spool/cron")
 
-        # Nombre de jobs cron (dans /etc/crontab uniquement, comme le
-        # prototype)
+        # Nombre de jobs cron (dans /etc/crontab uniquement, comme le prototype)
         cron_jobs = 0
         if os.path.exists("/etc/crontab"):
             try:
@@ -34,13 +36,13 @@ class ScheduledTasksCollector(BaseCollector):
                     cron_jobs = len(
                         [line for line in f.readlines() if line.strip() and not line.lstrip().startswith("#")]
                     )
-            except Exception as exc:  # pragma: no cover - log only
+            except Exception as exc:
                 logger.warning("Erreur lors de la lecture de /etc/crontab : %s", exc)
 
-        # Anacron disponible ?
+        # Vérification de la disponibilité d'Anacron
         anacron_active = os.path.exists("/usr/sbin/anacron")
 
-        # Timers systemd
+        # Nombre de timers systemd
         timers_count = 0
         try:
             result = subprocess.run(
@@ -54,9 +56,10 @@ class ScheduledTasksCollector(BaseCollector):
             # On ignore la première ligne d'entête si présente
             if len(lines) > 1:
                 timers_count = len([l for l in lines[1:] if l.strip()])
-        except Exception as exc:  # pragma: no cover - log only
+        except Exception as exc:
             logger.warning("Erreur lors de la récupération des timers systemd : %s", exc)
 
+        # Ajout des métriques collectées
         metrics.extend(
             [
                 {
@@ -65,6 +68,8 @@ class ScheduledTasksCollector(BaseCollector):
                     "type": "boolean",
                     "description": "Indique si le service cron est disponible",
                     "is_critical": False,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Type de collecteur
                 },
                 {
                     "name": "cron.jobs_count",
@@ -72,6 +77,8 @@ class ScheduledTasksCollector(BaseCollector):
                     "type": "numeric",
                     "description": "Nombre de tâches cron programmées (via /etc/crontab)",
                     "is_critical": False,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Type de collecteur
                 },
                 {
                     "name": "anacron.available",
@@ -79,6 +86,8 @@ class ScheduledTasksCollector(BaseCollector):
                     "type": "boolean",
                     "description": "Indique si le service Anacron est disponible",
                     "is_critical": False,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Type de collecteur
                 },
                 {
                     "name": "systemd_timers.count",
@@ -86,9 +95,12 @@ class ScheduledTasksCollector(BaseCollector):
                     "type": "numeric",
                     "description": "Nombre de timers systemd (tous états confondus)",
                     "is_critical": False,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Type de collecteur
                 },
             ]
         )
 
+        # Retour des métriques collectées
+        logger.info(f"Collecte terminée: {len(metrics)} métriques collectées.")
         return metrics
-

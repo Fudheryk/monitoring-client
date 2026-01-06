@@ -1,14 +1,11 @@
-# src/collectors/builtin/security.py
-
 import logging
 import subprocess
-
 import psutil
 
 from collectors.base_collector import BaseCollector
 
+# Configuration du logger
 logger = logging.getLogger(__name__)
-
 
 def _get_ssh_port() -> int:
     """
@@ -51,9 +48,14 @@ class SecurityCollector(BaseCollector):
     - version de sshd
     """
 
-    name = "security"
+    name = "security"  # Nom du collecteur
+    editor = "builtin"  # Type de collecteur
 
     def _collect_metrics(self):
+        """
+        Collecte les métriques liées à la sécurité.
+        :return: Liste des métriques collectées.
+        """
         metrics = []
 
         # Utilisateurs connectés (commande 'who')
@@ -143,6 +145,8 @@ class SecurityCollector(BaseCollector):
                     "type": "numeric",
                     "description": "Nombre d'utilisateurs connectés au système.",
                     "is_critical": False,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Type de collecteur
                 },
                 {
                     "name": "security.ssh_connections",
@@ -150,6 +154,8 @@ class SecurityCollector(BaseCollector):
                     "type": "numeric",
                     "description": "Nombre de connexions SSH actives.",
                     "is_critical": True,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Type de collecteur
                 },
                 {
                     "name": "security.suspicious_processes",
@@ -157,6 +163,8 @@ class SecurityCollector(BaseCollector):
                     "type": "numeric",
                     "description": "Nombre de processus suspects détectés.",
                     "is_critical": True,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Type de collecteur
                 },
                 {
                     "name": "security.high_cpu_processes",
@@ -164,6 +172,8 @@ class SecurityCollector(BaseCollector):
                     "type": "numeric",
                     "description": "Nombre de processus consommant plus de 80% de CPU.",
                     "is_critical": False,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Type de collecteur
                 },
                 {
                     "name": "security.open_ports_count",
@@ -171,6 +181,8 @@ class SecurityCollector(BaseCollector):
                     "type": "numeric",
                     "description": "Nombre de ports ouverts (LISTEN) sur le système.",
                     "is_critical": False,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Type de collecteur
                 },
                 {
                     "name": "security.sshd_version",
@@ -178,8 +190,12 @@ class SecurityCollector(BaseCollector):
                     "type": "string",
                     "description": "Version actuelle de SSH (sshd) sur le système.",
                     "is_critical": False,
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Type de collecteur
                 },
             ]
         )
 
+        # Retour des métriques collectées
+        logger.info(f"Collecte terminée: {len(metrics)} métriques collectées.")
         return metrics

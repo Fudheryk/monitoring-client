@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+import os
+import sys
 from dataclasses import dataclass
 from typing import Any, Dict, List
+
+# Ajouter le répertoire parent au sys.path pour l'import relatif
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+
+from __version__ import __version__
 
 from core.logger import get_logger, log_phase
 
@@ -16,15 +23,15 @@ class PayloadTransformerConfig:
     Configuration du transformer pour générer le payload API.
 
     - generator      : nom du client (ex: "monitoring-client")
-    - version        : version du client (ex: "0.1.0")
-    - schema_version : version du schéma de payload (ex: "1.0")
+    - version        : version du client
+    - schema_version : version du schéma de payload (ex: "1.1.0")
     - timestamp_field: nom du champ timestamp dans metadata (ex: "timestamp"
                        ou "collection_time")
     """
 
     generator: str = "monitoring-client"
-    version: str = "0.1.0"
-    schema_version: str = "1.0"
+    version: str = __version__
+    schema_version: str = "1.1.0"
     timestamp_field: str = "timestamp"
 
 

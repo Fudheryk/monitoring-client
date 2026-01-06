@@ -9,8 +9,8 @@ from core.logger import get_logger
 
 from ..base_collector import BaseCollector, Metric
 
+# Configuration du logger
 logger = get_logger(__name__)
-
 
 class FirewallCollector(BaseCollector):
     """
@@ -29,25 +29,37 @@ class FirewallCollector(BaseCollector):
       - firewall.firewalld.version (string)
     """
 
-    name = "firewall"
+    name = "firewall"  # Nom du collecteur
+    editor = "builtin"  # Type de collecteur
 
     def _collect_metrics(self) -> List[Metric]:
+        """
+        Collecte les métriques des pare-feu (UFW, iptables, firewalld).
+        :return: liste des métriques collectées
+        """
         metrics: List[Dict[str, Any]] = []
 
-        metrics.extend(self._collect_ufw())
-        metrics.extend(self._collect_iptables())
-        metrics.extend(self._collect_firewalld())
+        # Collecte des métriques pour chaque backend de pare-feu
+        metrics.extend(self._collect_ufw())        # Collecte pour UFW
+        metrics.extend(self._collect_iptables())    # Collecte pour iptables
+        metrics.extend(self._collect_firewalld())   # Collecte pour firewalld
 
+        # Retourne toutes les métriques collectées
+        logger.info(f"Collecte terminée: {len(metrics)} métriques collectées.")
         return metrics
 
     # ---- Helpers internes par backend ----
 
     def _collect_ufw(self) -> List[Metric]:
+        """
+        Collecte des métriques pour UFW (Uncomplicated Firewall).
+        :return: liste des métriques collectées pour UFW
+        """
         m: List[Dict[str, Any]] = []
 
         ufw_cmd = self._which_or_path("ufw", "/usr/sbin/ufw")
         if not ufw_cmd:
-            return m
+            return m  # Si UFW n'est pas installé, on retourne les métriques vides
 
         # Statut UFW
         try:
@@ -64,6 +76,8 @@ class FirewallCollector(BaseCollector):
                     "name": "firewall.ufw.enabled",
                     "value": enabled,
                     "type": "boolean",
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Nom de l'éditeur
                 }
             )
         except Exception as exc:
@@ -84,6 +98,8 @@ class FirewallCollector(BaseCollector):
                     "name": "firewall.ufw.version",
                     "value": version,
                     "type": "string",
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Nom de l'éditeur
                 }
             )
         except Exception as exc:
@@ -92,13 +108,17 @@ class FirewallCollector(BaseCollector):
         return m
 
     def _collect_iptables(self) -> List[Metric]:
+        """
+        Collecte des métriques pour iptables.
+        :return: liste des métriques collectées pour iptables
+        """
         m: List[Dict[str, Any]] = []
 
         iptables_cmd = self._which_or_path("iptables", "/usr/sbin/iptables")
         if not iptables_cmd:
-            return m
+            return m  # Si iptables n'est pas installé, on retourne les métriques vides
 
-        # Nombre de règles
+        # Nombre de règles iptables
         try:
             result = subprocess.run(
                 [iptables_cmd, "-L", "-n"],
@@ -120,6 +140,8 @@ class FirewallCollector(BaseCollector):
                         "name": "firewall.iptables.rules_count",
                         "value": rules_count,
                         "type": "numeric",
+                        "collector_name": self.name,  # Nom du collecteur
+                        "editor_name": self.editor,  # Nom de l'éditeur
                     }
                 )
         except Exception as exc:
@@ -140,6 +162,8 @@ class FirewallCollector(BaseCollector):
                     "name": "firewall.iptables.version",
                     "value": version,
                     "type": "string",
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Nom de l'éditeur
                 }
             )
         except Exception as exc:
@@ -148,11 +172,15 @@ class FirewallCollector(BaseCollector):
         return m
 
     def _collect_firewalld(self) -> List[Metric]:
+        """
+        Collecte des métriques pour firewalld.
+        :return: liste des métriques collectées pour firewalld
+        """
         m: List[Dict[str, Any]] = []
 
         fw_cmd = self._which_or_path("firewall-cmd", "/usr/bin/firewall-cmd")
         if not fw_cmd:
-            return m
+            return m  # Si firewalld n'est pas installé, on retourne les métriques vides
 
         # État firewalld
         try:
@@ -169,6 +197,8 @@ class FirewallCollector(BaseCollector):
                     "name": "firewall.firewalld.running",
                     "value": running,
                     "type": "boolean",
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Nom de l'éditeur
                 }
             )
         except Exception as exc:
@@ -189,6 +219,8 @@ class FirewallCollector(BaseCollector):
                     "name": "firewall.firewalld.version",
                     "value": version,
                     "type": "string",
+                    "collector_name": self.name,  # Nom du collecteur
+                    "editor_name": self.editor,  # Nom de l'éditeur
                 }
             )
         except Exception as exc:

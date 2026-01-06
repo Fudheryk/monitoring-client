@@ -18,9 +18,6 @@ from pipeline.validator import PayloadValidator
 from vendors.executor import CommandExecutor
 from vendors.parser import VendorParser
 
-# Affiche la version du client
-print(f"Monitoring Client - Version {__version__}")
-print(__version__)  # Debug: Affiche la version pour vérifier
 
 
 logger = get_logger(__name__)
@@ -80,6 +77,7 @@ def main() -> int:
     )
 
     logger.info("=== Monitoring Client - Starting Execution ===")
+    logger.info(f"Monitoring Client - Version {__version__}")
 
     # ------------------------
     # 1) LOAD CONFIG

@@ -1,48 +1,39 @@
 from __future__ import annotations
-
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
-
+from typing import Any, Dict, List, Union
 from core.logger import get_logger, log_phase
 
+# Configuration du logger (simplifiée)
 logger = get_logger(__name__)
 
-
+# Définition du type Metric
 Metric = Dict[str, Any]
-
 
 class BaseCollector(ABC):
     """
-    Classe de base pour tous les collecteurs builtin.
+    Classe de base pour tous les collecteurs. Elle définit les attributs `name` et `editor`
+    partagés par tous les collecteurs hérités. Elle inclut également la logique pour collecter
+    les métriques et normaliser leur format.
 
     Contrat :
       - collect() : méthode publique, robuste (ne doit jamais lever d'exception)
       - _collect_metrics() : méthode à implémenter, peut lever des exceptions internes
-
-    Les métriques doivent respecter le format :
-      {
-        "name": "category.metric_name",
-        "value": 123.4,
-        "type": "numeric" | "boolean" | "string"
-      }
     """
 
-    # Identifiant logique du collecteur (ex: "system", "network", "firewall")
-    name: str = "base"
+    # Attributs partagés entre tous les collecteurs
+    name: str = "base"  # Identifiant logique du collecteur
+    editor: str = "builtin"  # Type de collecteur (ex: "builtin", "custom")
 
     def collect(self) -> List[Metric]:
         """
-        Point d'entrée standard pour exécuter un collecteur.
-
-        Cette méthode :
-          - encapsule l'appel à _collect_metrics()
-          - gère les exceptions pour éviter de casser le pipeline
-          - garantit un retour de type list[dict]
+        Point d'entrée standard pour exécuter un collecteur. Cette méthode encapsule l'appel
+        à _collect_metrics(), gère les exceptions et garantit un retour de type list[dict].
         """
         phase_name = f"collector.{self.name}"
-        log_phase(logger, phase_name, f"Exécution du collecteur builtin '{self.name}'")
+        log_phase(logger, phase_name, f"Exécution du collecteur '{self.name}'")
 
         try:
+            # Appel de la méthode _collect_metrics() qui collecte les métriques spécifiques
             metrics = self._collect_metrics()
             if not isinstance(metrics, list):
                 logger.error(
@@ -52,6 +43,7 @@ class BaseCollector(ABC):
                 )
                 return []
 
+            # Normalisation des métriques avant de les retourner
             normalized: List[Metric] = []
             for metric in metrics:
                 norm = self._normalize_metric(metric)
@@ -71,23 +63,19 @@ class BaseCollector(ABC):
     @abstractmethod
     def _collect_metrics(self) -> List[Metric]:
         """
-        Implémentation réelle de la collecte.
-
-        Doit retourner une liste de métriques brutes (dicts).
-        Les erreurs peuvent être levées ici, elles seront gérées par collect().
+        Méthode à implémenter dans chaque collecteur spécifique. Elle doit retourner une liste de
+        métriques brutes sous forme de dictionnaires.
         """
         raise NotImplementedError
 
     # ---- Helpers de normalisation ----
 
-    @staticmethod
-    def _normalize_metric(metric: Dict[str, Any]) -> Metric | None:
+    def _normalize_metric(self, metric: Dict[str, Any]) -> Union[Metric, None]:
         """
-        Normalise une métrique brute et applique quelques règles simples :
-
-          - 'name' doit être une chaîne non vide
-          - 'type' ∈ {"numeric", "boolean", "string"}
-          - 'value' doit être cohérente avec 'type'
+        Normalise une métrique brute en appliquant des règles simples :
+        - 'name' doit être une chaîne non vide
+        - 'type' doit être parmi {"numeric", "boolean", "string"}
+        - 'value' doit être cohérent avec 'type'
         """
         if not isinstance(metric, dict):
             logger.warning("Métrique ignorée (type non dict): %r", metric)
@@ -105,10 +93,9 @@ class BaseCollector(ABC):
             logger.warning("Métrique ignorée (type invalide): %r", metric)
             return None
 
-        # Coercion légère selon le type
+        # Coercion selon le type
         if m_type == "numeric":
             if isinstance(value, bool):
-                # éviter True/False comme numériques
                 logger.warning("Métrique numeric avec bool détecté, ignorée: %r", metric)
                 return None
             if not isinstance(value, (int, float)):
@@ -119,7 +106,6 @@ class BaseCollector(ABC):
                     return None
         elif m_type == "boolean":
             if not isinstance(value, bool):
-                # Essai de conversion simple
                 if isinstance(value, str):
                     lower = value.strip().lower()
                     if lower in ("true", "1", "yes", "on"):
@@ -138,8 +124,11 @@ class BaseCollector(ABC):
             elif not isinstance(value, str):
                 value = str(value)
 
+        # Dynamique : On utilise self.__class__.__name__ pour obtenir la classe enfant
         return {
             "name": name,
             "value": value,
             "type": m_type,
+            "collector_name": self.__class__.__name__,  # Utilisation dynamique du nom de la classe enfant
+            "editor_name": self.editor,  # Si chaque enfant a un éditeur propre, il peut être défini ici
         }
