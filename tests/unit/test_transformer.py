@@ -1,4 +1,4 @@
-from src.pipeline.transformer import PayloadTransformer, PayloadTransformerConfig
+from monitoring_client.pipeline.transformer import PayloadTransformer, PayloadTransformerConfig
 
 
 def test_transformer_basic():

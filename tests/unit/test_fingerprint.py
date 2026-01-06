@@ -1,4 +1,4 @@
-from src.core.fingerprint import generate_fingerprint
+from monitoring_client.core.fingerprint import generate_fingerprint
 
 
 def test_fingerprint_deterministic(tmp_path):

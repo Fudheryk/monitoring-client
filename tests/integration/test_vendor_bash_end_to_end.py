@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.pipeline.validator import PayloadValidator
-from src.vendors.executor import CommandExecutor
-from src.vendors.parser import VendorParser
+from monitoring_client.pipeline.validator import PayloadValidator
+from monitoring_client.vendors.executor import CommandExecutor
+from monitoring_client.vendors.parser import VendorParser
 
 
 def test_vendor_bash_end_to_end(tmp_path):

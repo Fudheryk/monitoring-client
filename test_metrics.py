@@ -5,7 +5,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
-from src.collectors.loader import run_builtin_collectors
+from monitoring_client.collectors.loader import run_builtin_collectors
 
 print("=== Test des nouvelles métriques ===")
 metrics = run_builtin_collectors()

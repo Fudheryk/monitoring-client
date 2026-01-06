@@ -1,4 +1,4 @@
-from src.pipeline.validator import PayloadValidator
+from monitoring_client.pipeline.validator import PayloadValidator
 
 
 def test_validator_ok():

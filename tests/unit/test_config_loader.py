@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from src.core.config_loader import ConfigError, ConfigLoader
+from monitoring_client.core.config_loader import ConfigError, ConfigLoader
 
 
 def test_config_loader_ok(tmp_path):

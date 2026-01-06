@@ -19,9 +19,16 @@ echo "🔄 Synchronisation de la version vers ${NEW_VERSION}..."
 echo "$NEW_VERSION" > "$VERSION_FILE"
 echo "✓ VERSION"
 
-# 2. Mettre à jour le fichier src/__version__.py
+# 2. Mettre à jour le fichier src/monitoring_client/__version__.py
 # C'est la source unique de vérité pour la version dans le code.
-cat > src/__version__.py <<EOF
+
+if [ ! -f "src/monitoring_client/__version__.py" ]; then
+    echo "❌ Erreur : src/monitoring_client/__version__.py introuvable"
+    echo "   Vérifiez la structure du projet"
+    exit 1
+fi
+
+cat > src/monitoring_client/__version__.py <<EOF
 """Version information for monitoring-client."""
 
 __version__ = "${NEW_VERSION}"
@@ -30,7 +37,7 @@ __author__ = "Frederic GIL GARCIA"
 __license__ = "MIT"
 __email__ = "frederic.gilgarcia@gmail.com"
 EOF
-echo "✓ src/__version__.py"
+echo "✓ src/monitoring_client/__version__.py"
 
 # 3. Mettre à jour le fichier config/config.yaml.example
 # Le fichier de configuration peut contenir la version pour le déploiement ou la documentation.

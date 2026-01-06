@@ -5,12 +5,12 @@ echo ""
 
 # Extraire les versions depuis les fichiers
 VERSION_FILE=$(cat VERSION 2>/dev/null || echo "N/A")
-VERSION_PY=$(grep -E '^__version__' src/__version__.py 2>/dev/null | cut -d'"' -f2 || echo "N/A")
+VERSION_PY=$(grep -E '^__version__' src/monitoring_client/__version__.py 2>/dev/null | cut -d'"' -f2 || echo "N/A")
 VERSION_CONFIG=$(grep -E 'version:' config/config.yaml.example | head -1 | awk '{print $2}' | tr -d '"' || echo "N/A")
 
 # On ne vérifie pas src/main.py ici, car il importe déjà la version
 echo "VERSION file        : ${VERSION_FILE}"
-echo "src/__version__.py  : ${VERSION_PY}"
+echo "src/monitoring_client/__version__.py  : ${VERSION_PY}"
 echo "config.yaml.example : ${VERSION_CONFIG}"
 echo ""
 

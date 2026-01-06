@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.vendors.parser import VendorMetric, VendorParser
+from monitoring_client.vendors.parser import VendorMetric, VendorParser
 
 
 def test_parse_valid_vendor(tmp_path):

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from src.vendors.executor import CommandExecutor
-from src.vendors.parser import VendorMetric
+from monitoring_client.vendors.executor import CommandExecutor
+from monitoring_client.vendors.parser import VendorMetric
 
 
 def test_executor_basic():

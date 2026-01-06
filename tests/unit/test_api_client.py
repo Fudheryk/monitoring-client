@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
-from src.core.api_client import APIClient, APIClientConfig
+from monitoring_client.core.api_client import APIClient, APIClientConfig
 
 
 def test_api_client_success():

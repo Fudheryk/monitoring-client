@@ -1,4 +1,4 @@
-from src.pipeline.aggregator import MetricsAggregator
+from monitoring_client.pipeline.aggregator import MetricsAggregator
 
 
 def test_aggregator_override():

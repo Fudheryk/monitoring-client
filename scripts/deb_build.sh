@@ -88,9 +88,9 @@ check_prerequisites
 # Configuration du package
 # -----------------------------------------------------------------------------
 
-# Récupère la version depuis src/__version__.py
+# Récupère la version depuis src/monitoring_client/__version__.py
 VERSION="$(
-  grep -E '^__version__' "${PROJECT_ROOT}/src/__version__.py" \
+  grep -E '^__version__' "${PROJECT_ROOT}/src/monitoring_client/__version__.py" \
     | head -1 \
     | cut -d'"' -f2
 )"

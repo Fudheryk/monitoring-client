@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from src.collectors.loader import run_builtin_collectors
-from src.pipeline.aggregator import MetricsAggregator
-from src.pipeline.transformer import PayloadTransformer, PayloadTransformerConfig
-from src.pipeline.validator import PayloadValidator
-from src.vendors.executor import CommandExecutor
-from src.vendors.parser import VendorParser
+from monitoring_client.collectors.loader import run_builtin_collectors
+from monitoring_client.pipeline.aggregator import MetricsAggregator
+from monitoring_client.pipeline.transformer import PayloadTransformer, PayloadTransformerConfig
+from monitoring_client.pipeline.validator import PayloadValidator
+from monitoring_client.vendors.executor import CommandExecutor
+from monitoring_client.vendors.parser import VendorParser
 
 
 def test_pipeline_end_to_end(tmp_path):
