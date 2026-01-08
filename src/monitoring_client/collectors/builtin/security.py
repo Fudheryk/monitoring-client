@@ -122,7 +122,7 @@ class SecurityCollector(BaseCollector):
         try:
             # sshd -v écrit la version dans stderr
             result = subprocess.run(
-                ["sshd", "-v"],
+                ["sshd", "-V"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 universal_newlines=True,
