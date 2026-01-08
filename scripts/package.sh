@@ -45,6 +45,15 @@ echo "[package] Package dir  : ${PKG_DIR}"
 
 mkdir -p "${RELEASE_DIR}"
 
+# Sécurité : refuser de supprimer un répertoire appartenant à root
+if [[ -d "${PKG_DIR}" ]]; then
+  if [[ "$(stat -c %u "${PKG_DIR}")" -eq 0 ]]; then
+    echo "[package] ERREUR : ${PKG_DIR} appartient à root (Docker ?)"
+    echo "          Nettoie-le avec : sudo rm -rf ${PKG_DIR}"
+    exit 1
+  fi
+fi
+
 # -----------------------------------------------------------------------------
 # 1) Build du binaire via PyInstaller
 # -----------------------------------------------------------------------------
@@ -58,7 +67,7 @@ fi
 # -----------------------------------------------------------------------------
 # 2) Préparer arborescence du package
 # -----------------------------------------------------------------------------
-rm -rf "${PKG_DIR}"
+rm -rf "${PKG_DIR}" || true
 mkdir -p "${PKG_DIR}/bin"
 mkdir -p "${PKG_DIR}/config"
 mkdir -p "${PKG_DIR}/systemd"

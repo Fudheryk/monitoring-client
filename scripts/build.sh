@@ -13,6 +13,9 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${PROJECT_ROOT}/dist"
 SRC_DIR="${PROJECT_ROOT}/src"
 
+# Répertoire de travail PyInstaller (isolé pour éviter conflits Docker)
+PYI_BUILD_DIR="${PROJECT_ROOT}/.build-pyinstaller"
+
 BINARY_NAME="monitoring-client"
 
 # ⚠️ IMPORTANT :
@@ -40,11 +43,15 @@ fi
 mkdir -p "${DIST_DIR}"
 cd "${PROJECT_ROOT}"
 
-# Nettoyage précédent build PyInstaller (sans toucher aux *.spec)
-rm -rf build "${DIST_DIR:?}/${BINARY_NAME}" "${DIST_DIR:?}/${BINARY_NAME}.exe" 2>/dev/null || true
+# Nettoyage précédent build PyInstaller (isolé)
+rm -rf "${PYI_BUILD_DIR}" "${DIST_DIR:?}/${BINARY_NAME}" "${DIST_DIR:?}/${BINARY_NAME}.exe" 2>/dev/null || true
 
 echo "[build] Lancement de PyInstaller..."
-pyinstaller --clean --noconfirm "${SPEC_FILE}"
+pyinstaller \
+  --clean \
+  --noconfirm \
+  --workpath "${PYI_BUILD_DIR}" \
+  "${SPEC_FILE}"
 
 # Vérification binaire
 if [[ -f "${PROJECT_ROOT}/dist/${BINARY_NAME}" ]]; then

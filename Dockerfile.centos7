@@ -1,10 +1,40 @@
+# ============================================================================
+# monitoring-build – CentOS 7 build image
+#
+# Usage :
+#   docker build \
+#     --network=host \
+#     -f Dockerfile.centos7 \
+#     -t monitoring-build \
+#     .
+#
+# docker run --rm \
+#  --network=host \
+#  -v "$PWD:/build" \
+#  -w /build \
+#  monitoring-build \
+#  bash -c "chmod +x scripts/*.sh && ./scripts/make.sh"
+# ============================================================================
+
 FROM centos:7
 
-# Fix CentOS 7 EOL - Use vault mirrors
+# ----------------------------------------------------------------------------
+# Fix CentOS 7 EOL – use vault mirrors
+# ----------------------------------------------------------------------------
+# CentOS 7 étant EOL, les miroirs classiques sont hors service.
+# On force l'utilisation de vault.centos.org pour garantir yum.
 RUN sed -i 's|^mirrorlist=|#mirrorlist=|g' /etc/yum.repos.d/CentOS-*.repo && \
-    sed -i 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
+    sed -i 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' \
+        /etc/yum.repos.d/CentOS-*.repo
 
-# Install build dependencies
+# ----------------------------------------------------------------------------
+# Dépendances système de build
+# ----------------------------------------------------------------------------
+# Nécessaires pour :
+#  - OpenSSL
+#  - Python 3.11
+#  - psutil
+#  - PyInstaller
 RUN yum install -y \
     rpm-build \
     gcc \
@@ -17,40 +47,83 @@ RUN yum install -y \
     zlib-devel \
     && yum clean all
 
-# Compile OpenSSL 1.1.1 (CentOS 7 has only 1.0.2)
+# ----------------------------------------------------------------------------
+# Compilation OpenSSL 1.1.1w (IPv4 forcé)
+# ----------------------------------------------------------------------------
+# CentOS 7 fournit OpenSSL 1.0.2 → incompatible Python 3.11
+# On compile OpenSSL 1.1.1w dans /opt/openssl
 RUN cd /tmp && \
-    wget https://www.openssl.org/source/openssl-1.1.1w.tar.gz && \
+    wget -4 https://www.openssl.org/source/openssl-1.1.1w.tar.gz && \
     tar xzf openssl-1.1.1w.tar.gz && \
     cd openssl-1.1.1w && \
-    ./config --prefix=/opt/openssl --openssldir=/opt/openssl shared zlib && \
+    ./config \
+        --prefix=/opt/openssl \
+        --openssldir=/opt/openssl \
+        shared zlib && \
     make -j$(nproc) && \
     make install && \
     rm -rf /tmp/openssl-1.1.1w*
 
-# Install Python 3.11 from source (with custom OpenSSL)
+# ----------------------------------------------------------------------------
+# Exposer OpenSSL au linker dynamique (CRITIQUE)
+# ----------------------------------------------------------------------------
+# Sans cette étape :
+#  - openssl ne démarre pas
+#  - Python utilise OpenSSL 1.0.2
+RUN echo "/opt/openssl/lib" > /etc/ld.so.conf.d/openssl-1.1.conf && \
+    ldconfig
+
+# ----------------------------------------------------------------------------
+# Compilation Python 3.11.7 (AVEC libpython.so)
+# ----------------------------------------------------------------------------
+# --enable-shared → indispensable pour PyInstaller
+# --with-openssl-rpath=auto → bon linkage runtime
 RUN cd /tmp && \
     wget https://www.python.org/ftp/python/3.11.7/Python-3.11.7.tgz && \
     tar xzf Python-3.11.7.tgz && \
     cd Python-3.11.7 && \
     ./configure \
         --prefix=/opt/python311 \
+        --enable-shared \
         --with-openssl=/opt/openssl \
         --with-openssl-rpath=auto && \
     make -j$(nproc) && \
     make altinstall && \
     rm -rf /tmp/Python-3.11.7*
 
-# Install PyInstaller and dependencies with Python 3.11
-RUN /opt/python311/bin/python3.11 -m pip install --upgrade pip && \
-    /opt/python311/bin/python3.11 -m pip install \
+# ----------------------------------------------------------------------------
+# Exposer libpython au linker dynamique (CRITIQUE PyInstaller)
+# ----------------------------------------------------------------------------
+RUN echo "/opt/python311/lib" > /etc/ld.so.conf.d/python311.conf && \
+    ldconfig
+
+# ----------------------------------------------------------------------------
+# Exposer Python 3.11 sans casser yum
+# ----------------------------------------------------------------------------
+# IMPORTANT :
+#  - /usr/bin/python reste intact (yum dépend de Python 2)
+#  - /usr/local/bin/python → Python 3.11
+RUN ln -sf /opt/python311/bin/python3.11 /usr/local/bin/python && \
+    ln -sf /opt/python311/bin/pip3.11 /usr/local/bin/pip
+
+# ----------------------------------------------------------------------------
+# Dépendances Python (via Python 3.11)
+# ----------------------------------------------------------------------------
+RUN python -m pip install --upgrade pip && \
+    python -m pip install \
         pyinstaller \
         psutil \
         requests \
         PyYAML \
         jsonschema
 
-# Set Python 3.11 as default for builds
+# ----------------------------------------------------------------------------
+# Environnement
+# ----------------------------------------------------------------------------
 ENV PATH="/opt/python311/bin:${PATH}"
 ENV PYTHON_CMD="/opt/python311/bin/python3.11"
 
+# ----------------------------------------------------------------------------
+# Répertoire de travail (monté depuis l’hôte)
+# ----------------------------------------------------------------------------
 WORKDIR /build
