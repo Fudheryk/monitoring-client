@@ -80,8 +80,8 @@ git push origin "${TAG}" --force
 # ---------------------------------------------------------------------------
 
 echo
-echo "🧹 Nettoyage du build PyInstaller"
-sudo rm -rf .build-pyinstaller/ dist/
+echo "📦 Build du binaire (hôte)"
+./scripts/build.sh
 
 echo
 echo "📦 Build DEB (hôte)"
