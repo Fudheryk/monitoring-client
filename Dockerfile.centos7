@@ -1,0 +1,56 @@
+FROM centos:7
+
+# Fix CentOS 7 EOL - Use vault mirrors
+RUN sed -i 's|^mirrorlist=|#mirrorlist=|g' /etc/yum.repos.d/CentOS-*.repo && \
+    sed -i 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
+
+# Install build dependencies
+RUN yum install -y \
+    rpm-build \
+    gcc \
+    make \
+    tar \
+    wget \
+    perl \
+    bzip2-devel \
+    libffi-devel \
+    zlib-devel \
+    && yum clean all
+
+# Compile OpenSSL 1.1.1 (CentOS 7 has only 1.0.2)
+RUN cd /tmp && \
+    wget https://www.openssl.org/source/openssl-1.1.1w.tar.gz && \
+    tar xzf openssl-1.1.1w.tar.gz && \
+    cd openssl-1.1.1w && \
+    ./config --prefix=/opt/openssl --openssldir=/opt/openssl shared zlib && \
+    make -j$(nproc) && \
+    make install && \
+    rm -rf /tmp/openssl-1.1.1w*
+
+# Install Python 3.11 from source (with custom OpenSSL)
+RUN cd /tmp && \
+    wget https://www.python.org/ftp/python/3.11.7/Python-3.11.7.tgz && \
+    tar xzf Python-3.11.7.tgz && \
+    cd Python-3.11.7 && \
+    ./configure \
+        --prefix=/opt/python311 \
+        --with-openssl=/opt/openssl \
+        --with-openssl-rpath=auto && \
+    make -j$(nproc) && \
+    make altinstall && \
+    rm -rf /tmp/Python-3.11.7*
+
+# Install PyInstaller and dependencies with Python 3.11
+RUN /opt/python311/bin/python3.11 -m pip install --upgrade pip && \
+    /opt/python311/bin/python3.11 -m pip install \
+        pyinstaller \
+        psutil \
+        requests \
+        PyYAML \
+        jsonschema
+
+# Set Python 3.11 as default for builds
+ENV PATH="/opt/python311/bin:${PATH}"
+ENV PYTHON_CMD="/opt/python311/bin/python3.11"
+
+WORKDIR /build
