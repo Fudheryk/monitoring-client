@@ -105,3 +105,4 @@ release/
 # Ignore les fichiers sensibles
 data/api_key
 data/fingerprint
+*.SHA256SUMS.txt
