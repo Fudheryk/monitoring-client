@@ -51,18 +51,27 @@ if gh release view "${TAG}" >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------------
-# 1) Synchronisation de version + commit + tag
+# 1) Synchronisation de version + git
 # ---------------------------------------------------------------------------
 echo "🔄 Synchronisation version"
 ./scripts/sync_version.sh "${VERSION}"
 
-git add .
-git commit -m "chore: bump version to ${VERSION}"
-git tag "${TAG}"
+# Ajouter tous les fichiers modifiés par sync_version.sh
+git add VERSION src/monitoring_client/__version__.py config/config.yaml.example README.md
+
+# Commit si nécessaire
+if git diff --cached --quiet; then
+    echo "Aucun changement à commit pour la version ${VERSION}"
+else
+    git commit -m "chore: bump version to ${VERSION}"
+fi
+
+# Tag
+git tag -f "${TAG}"
 
 echo "📤 Push commit + tag"
 git push origin main
-git push origin "${TAG}"
+git push origin "${TAG}" --force
 
 # ---------------------------------------------------------------------------
 # 2) Build des artefacts
