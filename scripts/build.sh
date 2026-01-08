@@ -7,6 +7,8 @@ set -euo pipefail
 # - Utilise un fichier .spec PyInstaller (par défaut: pyinstaller.spec)
 # - Produit un binaire unique : dist/monitoring-client
 # - Inclut les fichiers de config (config.yaml.example + schema)
+# - Désinstalle toute ancienne version installée dans le venv pour éviter
+#   que PyInstaller embarque une version obsolète.
 # -----------------------------------------------------------------------------
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,6 +30,9 @@ echo "[build] Dist dir     : ${DIST_DIR}"
 echo "[build] Src dir      : ${SRC_DIR}"
 echo "[build] Spec file    : ${SPEC_FILE}"
 
+# ---------------------------------------------------------------------------
+# Vérifications préalables
+# ---------------------------------------------------------------------------
 if ! command -v pyinstaller >/dev/null 2>&1; then
   echo "[build] Erreur : pyinstaller n'est pas installé."
   echo "         Installe-le par exemple avec : pip install pyinstaller"
@@ -40,12 +45,26 @@ if [[ ! -f "${SPEC_FILE}" ]]; then
   exit 1
 fi
 
+# ---------------------------------------------------------------------------
+# 1) Nettoyage des anciennes versions
+# ---------------------------------------------------------------------------
+# Supprime toute ancienne version installée dans le venv pour éviter
+# que PyInstaller emballe une version obsolète.
+if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+  echo "[build] Désinstallation éventuelle de l'ancienne version dans le venv..."
+  pip uninstall -y monitoring-client || true
+fi
+
+# Nettoyage du build précédent
+rm -rf "${PYI_BUILD_DIR}" "${DIST_DIR:?}/${BINARY_NAME}" "${DIST_DIR:?}/${BINARY_NAME}.exe" 2>/dev/null || true
+
+# Création du répertoire de sortie
 mkdir -p "${DIST_DIR}"
 cd "${PROJECT_ROOT}"
 
-# Nettoyage précédent build PyInstaller (isolé)
-rm -rf "${PYI_BUILD_DIR}" "${DIST_DIR:?}/${BINARY_NAME}" "${DIST_DIR:?}/${BINARY_NAME}.exe" 2>/dev/null || true
-
+# ---------------------------------------------------------------------------
+# 2) Build avec PyInstaller
+# ---------------------------------------------------------------------------
 echo "[build] Lancement de PyInstaller..."
 pyinstaller \
   --clean \
@@ -53,9 +72,11 @@ pyinstaller \
   --workpath "${PYI_BUILD_DIR}" \
   "${SPEC_FILE}"
 
-# Vérification binaire
-if [[ -f "${PROJECT_ROOT}/dist/${BINARY_NAME}" ]]; then
-  echo "[build] Binaire généré : dist/${BINARY_NAME}"
+# ---------------------------------------------------------------------------
+# 3) Vérification du binaire
+# ---------------------------------------------------------------------------
+if [[ -f "${DIST_DIR}/${BINARY_NAME}" ]]; then
+  echo "[build] Binaire généré : ${DIST_DIR}/${BINARY_NAME}"
 else
   echo "[build] Erreur : binaire non trouvé après build."
   exit 1

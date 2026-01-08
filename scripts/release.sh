@@ -45,9 +45,11 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
+# Vérifie si la release existe déjà
+RELEASE_EXISTS=false
 if gh release view "${TAG}" >/dev/null 2>&1; then
-  echo "❌ La release ${TAG} existe déjà sur GitHub"
-  exit 1
+  RELEASE_EXISTS=true
+  echo "⚠️  La release ${TAG} existe déjà sur GitHub, les fichiers seront mis à jour"
 fi
 
 # ---------------------------------------------------------------------------
@@ -66,7 +68,7 @@ else
     git commit -m "chore: bump version to ${VERSION}"
 fi
 
-# Tag
+# Tag (force au cas où)
 git tag -f "${TAG}"
 
 echo "📤 Push commit + tag"
@@ -76,6 +78,11 @@ git push origin "${TAG}" --force
 # ---------------------------------------------------------------------------
 # 2) Build des artefacts
 # ---------------------------------------------------------------------------
+
+echo
+echo "🧹 Nettoyage du build PyInstaller"
+sudo rm -rf .build-pyinstaller/ dist/
+
 echo
 echo "📦 Build DEB (hôte)"
 ./scripts/deb_build.sh
@@ -103,16 +110,28 @@ echo "✓ SHA256 généré : ${SHA_FILE}"
 # ---------------------------------------------------------------------------
 # 5) Publication GitHub Release
 # ---------------------------------------------------------------------------
-gh release create "${TAG}" \
-  "${DEB_PATH}" \
-  "${RPM_PATH}" \
-  "${SHA_FILE}" \
-  --title "Version ${VERSION}" \
-  --notes "${RELEASE_NOTES}" \
-  --latest
+if [[ "${RELEASE_EXISTS}" == true ]]; then
+    # Upload uniquement les fichiers sur la release existante
+    gh release upload "${TAG}" \
+      "${DEB_PATH}" \
+      "${RPM_PATH}" \
+      "${SHA_FILE}" \
+      --clobber
+    echo
+    echo "✅ Fichiers de la release ${TAG} mis à jour sur GitHub"
+else
+    # Crée la release si elle n'existe pas
+    gh release create "${TAG}" \
+      "${DEB_PATH}" \
+      "${RPM_PATH}" \
+      "${SHA_FILE}" \
+      --title "Version ${VERSION}" \
+      --notes "${RELEASE_NOTES}" \
+      --latest
+    echo
+    echo "✅ Release ${TAG} publiée avec succès"
+fi
 
-echo
-echo "✅ Release ${TAG} publiée avec succès"
 echo "Fichiers disponibles :"
 echo "  DEB : ${DEB_PATH}"
 echo "  RPM : ${RPM_PATH}"
