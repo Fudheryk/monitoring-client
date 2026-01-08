@@ -23,9 +23,10 @@ fi
 TAG="v${VERSION}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-DEB_PATH="${PROJECT_ROOT}/release/monitoring-client_${VERSION}_amd64.deb"
+RELEASE_DIR="${PROJECT_ROOT}/release"
+DEB_PATH="${RELEASE_DIR}/monitoring-client_${VERSION}_amd64.deb"
 RPM_PATH="${PROJECT_ROOT}/rpmbuild/RPMS/x86_64/monitoring-client-${VERSION}-1.x86_64.rpm"
-SHA_FILE="/tmp/monitoring-client_${VERSION}_SHA256SUMS.txt"
+SHA_FILE="${RELEASE_DIR}/monitoring-client_${VERSION}_SHA256SUMS.txt"
 
 echo "🚀 Release ${TAG}"
 echo
@@ -46,8 +47,13 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
+if gh release view "${TAG}" >/dev/null 2>&1; then
+  echo "❌ La release ${TAG} existe déjà sur GitHub"
+  exit 1
+fi
+
 # ------------------------------------------------------------------------------
-# 1) Synchronisation de version + git
+# 1) Synchronisation version + git
 # ------------------------------------------------------------------------------
 echo "🔄 Synchronisation version"
 ./scripts/sync_version.sh "${VERSION}"
@@ -55,6 +61,10 @@ echo "🔄 Synchronisation version"
 git add .
 git commit -m "chore: bump version to ${VERSION}"
 git tag "${TAG}"
+
+echo "📤 Push commit + tag"
+git push origin main
+git push origin "${TAG}"
 
 # ------------------------------------------------------------------------------
 # 2) Build des artefacts
@@ -80,7 +90,7 @@ done
 # ------------------------------------------------------------------------------
 # 4) Génération SHA256SUMS
 # ------------------------------------------------------------------------------
-sha256sum "${DEB_PATH}" "${RPM_PATH}" > "${SHA_FILE}"
+sha256sum "$(basename "${DEB_PATH}")" "$(basename "${RPM_PATH}")" > "${SHA_FILE}"
 echo "✓ SHA256 généré : ${SHA_FILE}"
 
 # ------------------------------------------------------------------------------
