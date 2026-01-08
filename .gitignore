@@ -23,6 +23,7 @@ ENV/
 build/
 dist/
 *.spec
+.build-pyinstaller/
 
 # 3. Fichiers de configuration
 # --------------------------------------------
