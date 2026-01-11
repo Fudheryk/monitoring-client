@@ -15,7 +15,7 @@ client:
   version: "0.1"
   schema_version: "1.0"
 api:
-  base_url: "http://localhost:8000"
+  base_url: "http://localhost"
   metrics_endpoint: "/api"
   timeout_seconds: 1
   max_retries: 1

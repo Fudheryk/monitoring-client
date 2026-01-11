@@ -7,7 +7,7 @@ from monitoring_client.core.api_client import APIClient, APIClientConfig
 
 def test_api_client_success():
     cfg = APIClientConfig(
-        base_url="http://localhost:8000", metrics_endpoint="/api", api_key_header="X-API", api_key="key"
+        base_url="http://localhost", metrics_endpoint="/api", api_key_header="X-API", api_key="key"
     )
 
     client = APIClient(cfg)

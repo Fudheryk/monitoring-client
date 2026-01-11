@@ -134,7 +134,7 @@ Configuration minimale requise :
 
 ```yaml
 api:
-  base_url: "https://monitoring.exemple.com"
+  base_url: "https://neonmonitor.dockl.com"
   metrics_endpoint: "/api/v1/ingest/metrics"
   api_key_file: "/etc/monitoring-client/api_key"
   timeout_seconds: 30
