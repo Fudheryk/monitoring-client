@@ -27,7 +27,7 @@
       "properties": {
         "base_url": {
           "type": "string",
-          "pattern": "^https?://.+"
+          "pattern": "^https?://[^/:]+(:[0-9]+)?$"
         },
         "metrics_endpoint": {
           "type": "string",

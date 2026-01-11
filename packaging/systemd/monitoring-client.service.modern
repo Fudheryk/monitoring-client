@@ -1,0 +1,25 @@
+[Unit]
+Description=Monitoring Client Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/bin/monitoring-client --config /opt/monitoring-client/config/config.yaml
+WorkingDirectory=/opt/monitoring-client
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=monitoring-client
+
+# Sécurité renforcée (systemd >= 231)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+# ReadWritePaths disponible sur systemd >= 231
+ReadWritePaths=/var/log/monitoring-client /opt/monitoring-client/data
+
+[Install]
+WantedBy=multi-user.target

@@ -93,15 +93,18 @@ class ConfigLoader:
       - Résoudre la clé API à partir d'un fichier ou d'une variable d'environnement.
     """
 
+    DEFAULT_DEFAULTS_PATH = Path("config/config.defaults.yaml")
     DEFAULT_CONFIG_PATH = Path("config/config.yaml")
     DEFAULT_SCHEMA_PATH = Path("config/config.schema.json")
 
     def __init__(
         self,
         config_path: Optional[Path] = None,
+        defaults_path: Optional[Path] = None,
         schema_path: Optional[Path] = None,
         base_dir: Optional[Path] = None,
     ) -> None:
+        self.defaults_path = defaults_path or self.DEFAULT_DEFAULTS_PATH
         self.config_path = config_path or self.DEFAULT_CONFIG_PATH
         self.schema_path = schema_path or self.DEFAULT_SCHEMA_PATH
         # base_dir = racine du projet (pour PyInstaller, on pourra l'adapter)
@@ -109,15 +112,19 @@ class ConfigLoader:
 
     def load(self) -> Config:
         """Point d'entrée principal : retourne un objet Config prêt à l'emploi."""
-        log_phase(logger, "config.load", f"Chargement configuration depuis {self.config_path}")
-
-        raw_config = self._read_config_file(self.config_path)
+        log_phase(
+            logger,
+            "config.load",
+            f"Chargement defaults={self.defaults_path}, overrides={self.config_path}",
+        )
+        
+        defaults = self._read_config_file(self.defaults_path)
+        overrides = self._read_config_file(self.config_path)
+        self._validate_override_keys(defaults, overrides)
         schema = self._read_schema_file(self.schema_path)
-
-        self._validate_against_schema(raw_config, schema)
-
+        raw_config = self._deep_merge(defaults, overrides)
         raw_config = self._apply_env_overrides(raw_config)
-
+        self._validate_against_schema(raw_config, schema)
         client_cfg = self._build_client_config(raw_config["client"])
         api_cfg = self._build_api_config(raw_config["api"])
         paths_cfg = self._build_paths_config(raw_config["paths"])
@@ -321,3 +328,31 @@ class ConfigLoader:
         if not path.is_absolute():
             path = base_dir / path
         return path
+
+    @staticmethod
+    def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Merge profond :
+        - base = defaults
+        - override = config utilisateur
+        """
+        result = dict(base)
+        for key, value in override.items():
+            if (
+                key in result
+                and isinstance(result[key], dict)
+                and isinstance(value, dict)
+            ):
+                result[key] = ConfigLoader._deep_merge(result[key], value)
+            else:
+                result[key] = value
+        return result
+    
+    def _validate_override_keys(self, defaults, overrides, path=""):
+    for key in overrides:
+        if key not in defaults:
+            raise ConfigError(f"Clé inconnue dans config.yaml : {path}{key}")
+        if isinstance(overrides[key], dict) and isinstance(defaults.get(key), dict):
+            self._validate_override_keys(
+                defaults[key], overrides[key], path=f"{path}{key}."
+            )

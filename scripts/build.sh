@@ -48,9 +48,22 @@ fi
 # ---------------------------------------------------------------------------
 # 1) Nettoyage des anciennes versions
 # ---------------------------------------------------------------------------
+# Supprime toute ancienne version installée dans le venv pour éviter
+# que PyInstaller emballe une version obsolète.
+if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+  echo "[build] Désinstallation éventuelle de l'ancienne version dans le venv..."
+  pip uninstall -y monitoring-client || true
+fi
 
 # Nettoyage du build précédent
+echo "[build] Nettoyage des anciens builds..."
 rm -rf "${PYI_BUILD_DIR}" "${DIST_DIR:?}/${BINARY_NAME}" "${DIST_DIR:?}/${BINARY_NAME}.exe" 2>/dev/null || true
+
+# Nettoyage du cache PyInstaller utilisateur (résout PermissionError)
+if [[ -d "${HOME}/.cache/pyinstaller" ]]; then
+  echo "[build] Nettoyage du cache PyInstaller..."
+  rm -rf "${HOME}/.cache/pyinstaller"
+fi
 
 # Création du répertoire de sortie
 mkdir -p "${DIST_DIR}"
@@ -71,6 +84,7 @@ pyinstaller \
 # ---------------------------------------------------------------------------
 if [[ -f "${DIST_DIR}/${BINARY_NAME}" ]]; then
   echo "[build] Binaire généré : ${DIST_DIR}/${BINARY_NAME}"
+  echo "[build] Taille        : $(du -h "${DIST_DIR}/${BINARY_NAME}" | cut -f1)"
 else
   echo "[build] Erreur : binaire non trouvé après build."
   exit 1

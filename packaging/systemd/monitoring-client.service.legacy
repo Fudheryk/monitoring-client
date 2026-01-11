@@ -1,0 +1,30 @@
+[Unit]
+Description=Monitoring Client Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/bin/monitoring-client --config /opt/monitoring-client/config/config.yaml
+WorkingDirectory=/opt/monitoring-client
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=monitoring-client
+
+# Sécurité renforcée (compatible systemd 219 - CentOS 7)
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Note: ReadWritePaths n'existe pas sur systemd < 231
+# On utilise ReadWriteDirectories (ancienne syntaxe)
+ReadWriteDirectories=/var/log/monitoring-client /opt/monitoring-client/data
+ReadOnlyDirectories=/opt/monitoring-client/config /opt/monitoring-client/vendors
+
+# ProtectSystem=strict n'existe pas sur systemd 219
+# On utilise ProtectSystem=full à la place
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

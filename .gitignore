@@ -55,7 +55,6 @@ poetry.lock
 # --------------------------------------------
 
 # Dossiers contenant les paquets générés
-packaging/
 rpmbuild/
 release/
 *.deb

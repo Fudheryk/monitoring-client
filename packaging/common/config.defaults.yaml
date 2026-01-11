@@ -1,0 +1,37 @@
+client:
+  name: "monitoring-client"
+  version: "1.0.0"
+  schema_version: "1.0.0"
+
+api:
+  base_url: "https://neonmonitor.dockl.com:8000"
+  metrics_endpoint: "/api/v1/ingest/metrics"
+  timeout_seconds: 5
+  max_retries: 3
+  api_key_header: "X-API-Key"
+  api_key_file: "data/api_key"
+  api_key_env_var: "MONITORING_API_KEY"
+
+paths:
+  builtin_collectors_dir: "src/collectors/builtin"
+  vendors_dir: "vendors"
+  data_dir: "data"
+  logs_dir: "/var/log/monitoring-client"
+
+machine:
+  hostname_source: "system"
+  hostname_override: null
+  os_override: null
+
+fingerprint:
+  method: "default"
+  salt: null
+  force_recompute: false
+  cache_file: "fingerprint"
+
+logging:
+  level: "INFO"
+  format: "plain"
+  console_enabled: true
+  file_enabled: false
+  file_name: "monitoring-client.log"
