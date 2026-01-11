@@ -1,7 +1,7 @@
 import json
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import requests
 
@@ -24,7 +24,7 @@ class APIClientConfig:
     api_key: str
     timeout_seconds: float = 5.0
     max_retries: int = 3
-    verify_ssl: bool = True
+    verify_ssl: Union[bool, str] = True
 
 
 class APIClientError(Exception):
@@ -40,7 +40,7 @@ class APIClient:
       - Envoi POST JSON.
       - Gestion de timeout.
       - Stratégie de retry exponentiel (jusqu'à max_retries).
-      - Validation SSL.
+      - Validation SSL configurable (True/False/chemin CA).
       - Logging détaillé des requêtes / réponses.
     """
 
@@ -54,6 +54,14 @@ class APIClient:
             "Accept": "application/json",
             config.api_key_header: config.api_key,
         }
+        
+        # Log SSL configuration
+        if isinstance(config.verify_ssl, str):
+            logger.info("SSL: Utilisation du certificat CA custom : %s", config.verify_ssl)
+        elif config.verify_ssl:
+            logger.info("SSL: Vérification activée (certificats système)")
+        else:
+            logger.warning("SSL: Vérification désactivée (DÉVELOPPEMENT UNIQUEMENT)")
 
     @property
     def base_url(self) -> str:
@@ -126,6 +134,17 @@ class APIClient:
                 )
                 last_exc = APIClientError(f"Erreur serveur HTTP {response.status_code}: {response.text}")
 
+            except requests.exceptions.SSLError as exc:
+                logger.error(
+                    "Erreur SSL lors de l'envoi des métriques: %s",
+                    exc,
+                )
+                logger.error(
+                    "Vérifiez la configuration SSL (ssl_verify/ssl_cert_path) ou "
+                    "le certificat du serveur."
+                )
+                raise APIClientError(f"Erreur SSL: {exc}") from exc
+                
             except (requests.Timeout, requests.ConnectionError, requests.RequestException) as exc:
                 logger.warning(
                     "Erreur réseau lors de l'envoi des métriques (tentative %d/%d): %s",
@@ -176,13 +195,22 @@ def build_api_client_from_config(app_config: "Config") -> APIClient:  # type: ig
       - app_config.resolved_api_key
     """
     api_cfg = app_config.api
+    
+    # Gestion de verify_ssl
+    if api_cfg.ssl_cert_path:
+        # Chemin vers un CA bundle custom
+        verify_ssl = api_cfg.ssl_cert_path
+    else:
+        # True ou False selon la config
+        verify_ssl = api_cfg.ssl_verify
+    
     client_cfg = APIClientConfig(
         base_url=api_cfg.base_url,
+        verify_ssl=verify_ssl,
         metrics_endpoint=api_cfg.metrics_endpoint,
         api_key_header=api_cfg.api_key_header,
         api_key=app_config.resolved_api_key,
         timeout_seconds=api_cfg.timeout_seconds,
         max_retries=api_cfg.max_retries,
-        verify_ssl=True,  # par défaut on valide SSL, peut être rendu paramétrable si besoin
     )
     return APIClient(client_cfg)

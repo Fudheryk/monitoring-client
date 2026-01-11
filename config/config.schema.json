@@ -29,6 +29,14 @@
           "type": "string",
           "pattern": "^https?://[^/:]+(:[0-9]+)?$"
         },
+        "ssl_verify": {
+          "type": "boolean",
+          "description": "Verify SSL certificates (set to false for self-signed)"
+        },
+        "ssl_cert_path": {
+          "type": ["string", "null"],
+          "description": "Path to custom CA certificate bundle"
+        },
         "metrics_endpoint": {
           "type": "string",
           "minLength": 1

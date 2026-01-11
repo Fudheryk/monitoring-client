@@ -8,7 +8,9 @@ client:
 
 api:
   # Base URL of the monitoring server (no trailing slash)
-  base_url: "https://neonmonitor.dockl.com"
+  base_url: "https://monitoring.local"
+  ssl_verify: true
+  ssl_cert_path: null
   # Metrics endpoint relative to base_url
   metrics_endpoint: "/api/v1/ingest/metrics"
   # HTTP timeout in seconds

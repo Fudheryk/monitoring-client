@@ -4,10 +4,14 @@ client:
   schema_version: "1.0.0"
 
 api:
-  base_url: "https://neonmonitor.dockl.com"
+  base_url: "https://monitoring.local"
+  ssl_verify: true
+  ssl_cert_path: null
   metrics_endpoint: "/api/v1/ingest/metrics"
   timeout_seconds: 5
   max_retries: 3
+  ssl_verify: true
+  ssl_cert_path: null
   api_key_header: "X-API-Key"
   api_key_file: "data/api_key"
   api_key_env_var: "MONITORING_API_KEY"

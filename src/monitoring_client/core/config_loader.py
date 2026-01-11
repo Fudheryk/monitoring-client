@@ -16,6 +16,8 @@ logger = get_logger(__name__)
 @dataclass
 class ApiConfig:
     base_url: str
+    ssl_verify: bool
+    ssl_cert_path: Optional[str]
     metrics_endpoint: str
     timeout_seconds: float
     max_retries: int
@@ -247,6 +249,8 @@ class ConfigLoader:
     def _build_api_config(self, raw: Dict[str, Any]) -> ApiConfig:
         return ApiConfig(
             base_url=raw["base_url"].rstrip("/"),
+            ssl_verify=bool(raw.get("ssl_verify", True)),
+            ssl_cert_path=raw.get("ssl_cert_path"),
             metrics_endpoint=raw["metrics_endpoint"],
             timeout_seconds=float(raw["timeout_seconds"]),
             max_retries=int(raw["max_retries"]),
@@ -349,10 +353,10 @@ class ConfigLoader:
         return result
     
     def _validate_override_keys(self, defaults, overrides, path=""):
-    for key in overrides:
-        if key not in defaults:
-            raise ConfigError(f"Clé inconnue dans config.yaml : {path}{key}")
-        if isinstance(overrides[key], dict) and isinstance(defaults.get(key), dict):
-            self._validate_override_keys(
-                defaults[key], overrides[key], path=f"{path}{key}."
-            )
+        for key in overrides:
+            if key not in defaults:
+                raise ConfigError(f"Clé inconnue dans config.yaml : {path}{key}")
+            if isinstance(overrides[key], dict) and isinstance(defaults.get(key), dict):
+                self._validate_override_keys(
+                    defaults[key], overrides[key], path=f"{path}{key}."
+                )
