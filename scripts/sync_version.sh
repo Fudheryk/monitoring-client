@@ -44,6 +44,11 @@ echo "✓ src/monitoring_client/__version__.py"
 sed -i "s/version: \".*\"/version: \"${NEW_VERSION}\"/" config/config.yaml.example
 echo "✓ config/config.yaml.example"
 
+# 3. Mettre à jour le fichier packaging/common/config.defaults.yaml
+# Le fichier de configuration peut contenir la version pour le déploiement ou la documentation.
+sed -i "s/version: \".*\"/version: \"${NEW_VERSION}\"/" config/config.yaml.example
+echo "✓ packaging/common/config.defaults.yaml"
+
 # 4. Mettre à jour README.md si nécessaire
 # Si le fichier README.md mentionne la version, nous devons le mettre à jour.
 if [ -f README.md ]; then
@@ -51,6 +56,8 @@ if [ -f README.md ]; then
     sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v${NEW_VERSION}/g" README.md
     echo "✓ README.md"
 fi
+
+
 
 
 echo ""

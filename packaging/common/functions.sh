@@ -83,7 +83,7 @@ client:
   schema_version: "1.0.0"
 
 api:
-  base_url: "https://neonmonitor.dockl.com"
+  base_url: "https://monitoring.local"
   metrics_endpoint: "/api/v1/ingest/metrics"
   timeout_seconds: 5
   max_retries: 3
