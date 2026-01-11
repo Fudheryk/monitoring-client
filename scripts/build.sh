@@ -57,12 +57,20 @@ fi
 
 # Nettoyage du build précédent
 echo "[build] Nettoyage des anciens builds..."
-rm -rf "${PYI_BUILD_DIR}" "${DIST_DIR:?}/${BINARY_NAME}" "${DIST_DIR:?}/${BINARY_NAME}.exe" 2>/dev/null || true
+if ! rm -rf "${PYI_BUILD_DIR}" 2>/dev/null; then
+  echo "[build] [!] Fichiers verrouillés détectés, utilisation de sudo..."
+  sudo rm -rf "${PYI_BUILD_DIR}"
+fi
+
+rm -rf "${DIST_DIR:?}/${BINARY_NAME}" "${DIST_DIR:?}/${BINARY_NAME}.exe" 2>/dev/null || true
 
 # Nettoyage du cache PyInstaller utilisateur (résout PermissionError)
 if [[ -d "${HOME}/.cache/pyinstaller" ]]; then
   echo "[build] Nettoyage du cache PyInstaller..."
-  rm -rf "${HOME}/.cache/pyinstaller"
+  if ! rm -rf "${HOME}/.cache/pyinstaller" 2>/dev/null; then
+    echo "[build] [!] Cache verrouillé, utilisation de sudo..."
+    sudo rm -rf "${HOME}/.cache/pyinstaller"
+  fi
 fi
 
 # Création du répertoire de sortie
