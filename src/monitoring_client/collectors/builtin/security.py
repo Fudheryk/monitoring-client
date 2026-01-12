@@ -1,31 +1,34 @@
 import logging
 import re
 import subprocess
-from typing import List, Dict, Any
-from pathlib import Path
-
 import time
+from pathlib import Path
+from typing import Any, Dict, List
+
 import psutil
 
 from monitoring_client.collectors.base_collector import BaseCollector
 
 logger = logging.getLogger(__name__)
 
-
+# Processus connus "bruyants" mais légitimes (GNOME Tracker, etc.)
 EXCLUDED_PROCESS_PREFIXES = (
     "tracker-miner",
     "tracker-extract",
     "tracker-store",
 )
 
+
 def _get_sshd_version() -> str:
     """
     Retourne la version de sshd de façon compatible Debian/CentOS.
 
     Notes:
-    - Debian: `/usr/sbin/sshd -V` renvoie directement `OpenSSH_...` (souvent sur stdout/stderr)
-    - CentOS 7: `/usr/sbin/sshd -V` affiche parfois "unknown option -- V" mais la ligne OpenSSH
-      est quand même présente dans la sortie (stdout/stderr). On cherche donc la ligne contenant OpenSSH.
+    - Debian: `/usr/sbin/sshd -V` renvoie souvent directement `OpenSSH_...`
+      (parfois sur stderr).
+    - CentOS 7: `/usr/sbin/sshd -V` peut afficher "unknown option -- V" mais la ligne
+      OpenSSH est quand même présente dans la sortie (stdout/stderr).
+    - On concatène stdout+stderr et on extrait la partie "OpenSSH_..." si possible.
     """
     try:
         result = subprocess.run(
@@ -62,9 +65,7 @@ def _get_ssh_port(default: int = 22) -> int:
     :param default: port par défaut si rien n'est détectable
     :return: port ssh (int)
     """
-    # ------------------------------------------------------------
     # 1) Méthode la plus fiable : sshd -T (config effective)
-    # ------------------------------------------------------------
     sshd_candidates = ["/usr/sbin/sshd", "sshd"]
     for sshd_bin in sshd_candidates:
         try:
@@ -83,16 +84,16 @@ def _get_ssh_port(default: int = 22) -> int:
                     if line.startswith("port "):
                         parts = line.split()
                         if len(parts) >= 2 and parts[1].isdigit():
-                            return int(parts[1])
+                            port = int(parts[1])
+                            if 1 <= port <= 65535:
+                                return port
 
         except FileNotFoundError:
             continue
         except Exception as exc:  # pragma: no cover - log only
             logger.debug("Erreur sshd -T via %s: %s", sshd_bin, exc)
 
-    # ------------------------------------------------------------
     # 2) Fallback : parse sshd_config
-    # ------------------------------------------------------------
     config_path = Path("/etc/ssh/sshd_config")
     if config_path.exists():
         try:
@@ -110,15 +111,23 @@ def _get_ssh_port(default: int = 22) -> int:
         except Exception as exc:  # pragma: no cover - log only
             logger.debug("Erreur parsing %s: %s", str(config_path), exc)
 
-    # ------------------------------------------------------------
     # 3) Dernier recours
-    # ------------------------------------------------------------
     return int(default)
 
 
 class SecurityCollector(BaseCollector):
     """
     Collecteur de métriques de sécurité (best effort).
+
+    Objectifs:
+    - Rester portable (Debian/CentOS/RHEL) et peu intrusif.
+    - Donner des signaux "grossiers" mais utiles (connexions SSH, ports, heuristiques process).
+    - Éviter les faux positifs évidents (ex: threads kernel type "[crypto]").
+
+    Notes importantes:
+    - Les threads kernel apparaissent souvent avec un nom entre crochets: "[kworker/...]", "[crypto]", etc.
+      Ils ne sont pas des processus userland et génèrent beaucoup de faux positifs si on cherche des mots-clés.
+    - psutil.cpu_percent() nécessite un "warmup" (premier appel = 0.0 la plupart du temps).
     """
 
     name = "security"
@@ -150,6 +159,7 @@ class SecurityCollector(BaseCollector):
         ssh_connections = 0
         try:
             for conn in psutil.net_connections(kind="inet"):
+                # Connexion établie dont le port local = port SSH
                 if conn.laddr and conn.laddr.port == ssh_port and conn.status == psutil.CONN_ESTABLISHED:
                     ssh_connections += 1
         except Exception as exc:  # pragma: no cover - log only
@@ -163,41 +173,52 @@ class SecurityCollector(BaseCollector):
         suspicious_keywords = ["crypto", "miner", "bot", "malware"]
 
         try:
-            # Warmup CPU%: sinon cpu_percent est souvent à 0 au premier passage.
+            # Warmup CPU% : sinon cpu_percent est très souvent 0 au premier passage.
+            # On prime sans intervalle, on attend un court instant, puis on mesure.
             for p in psutil.process_iter(attrs=["pid"]):
                 try:
-                    p.cpu_percent(None)
+                    p.cpu_percent(interval=None)
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     continue
 
             time.sleep(0.2)
 
+            # On itère ensuite "proprement" avec une lecture CPU par process.
             for proc in psutil.process_iter(attrs=["pid", "name", "username"]):
                 try:
                     info = proc.info or {}
                     username = (info.get("username") or "").strip()
-                    name = (info.get("name") or "").lower().strip()
+                    name_raw = (info.get("name") or "").strip()
+                    name = name_raw.lower()
 
-                    # Exclusions connues (ex: GNOME Tracker)
+                    # 3.a) Filtrer les threads kernel: nom entre crochets => faux positifs fréquents
+                    # Exemple sur CentOS: "[crypto]" (thread kernel)
+                    if name.startswith("[") and name.endswith("]"):
+                        continue
+
+                    # 3.b) Exclusions connues (ex: GNOME Tracker)
                     if name.startswith(EXCLUDED_PROCESS_PREFIXES):
                         continue
 
-                    # Mesure CPU réelle après warmup
+                    # 3.c) Mesure CPU réelle après warmup
                     try:
-                        cpu = float(proc.cpu_percent(None) or 0.0)
+                        cpu = float(proc.cpu_percent(interval=None) or 0.0)
                     except (psutil.NoSuchProcess, psutil.AccessDenied, TypeError, ValueError):
                         cpu = 0.0
 
-                    # Heuristiques "processus suspects"
+                    # 3.d) Heuristiques "processus suspects"
+                    # - user "nobody"/"nfsnobody" (signal faible, mais utile)
+                    # - nom contenant des keywords (crypto/miner/bot/malware)
                     if username in ("nobody", "nfsnobody") or any(kw in name for kw in suspicious_keywords):
                         suspicious_processes += 1
 
-
+                    # 3.e) Heuristique "high CPU" (processus > 80%)
                     if cpu > 80.0:
                         high_cpu_processes += 1
 
                 except (psutil.NoSuchProcess, psutil.AccessDenied, TypeError, ValueError):
                     continue
+
         except Exception as exc:  # pragma: no cover - log only
             logger.warning("Erreur lors de la récupération des processus pour la sécurité : %s", exc)
 
@@ -244,7 +265,7 @@ class SecurityCollector(BaseCollector):
                     "name": "suspicious_processes",
                     "value": int(suspicious_processes),
                     "type": "numeric",
-                    "description": "Nombre de processus suspects détectés (heuristiques simples).",
+                    "description": "Nombre de processus suspects détectés (heuristiques simples, threads kernel exclus).",
                     "is_critical": True,
                     "collector_name": self.name,
                     "editor_name": self.editor,

@@ -1,7 +1,7 @@
 client:
   name: "monitoring-client"
-  version: "1.0.52"
-  schema_version: "1.0.52"
+  version: "1.0.55"
+  schema_version: "1.0.55"
 
 api:
   base_url: "https://monitoring.local"
