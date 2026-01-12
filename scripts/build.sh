@@ -21,6 +21,9 @@ set -euo pipefail
 # - Il est safe pour Docker/CI (nettoyage + --clean PyInstaller).
 # -----------------------------------------------------------------------------
 
+
+# USER n'est pas toujours défini (ex: docker + set -u). On calcule un identifiant sûr.
+RUN_USER="${USER:-$(id -un 2>/dev/null || echo unknown)}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${PROJECT_ROOT}/dist"
 SRC_DIR="${PROJECT_ROOT}/src"
@@ -31,7 +34,7 @@ SRC_DIR="${PROJECT_ROOT}/src"
 #   et casser les builds suivants (PermissionError).
 # - En utilisant /tmp, on évite définitivement ce problème.
 # - Le chemin est user-scopé pour éviter collisions multi-users.
-PYI_BUILD_DIR="${TMPDIR:-/tmp}/monitoring-client-pyinstaller-${USER}"
+PYI_BUILD_DIR="${TMPDIR:-/tmp}/monitoring-client-pyinstaller-${RUN_USER}"
 
 BINARY_NAME="monitoring-client"
 

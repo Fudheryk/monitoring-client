@@ -32,6 +32,7 @@ DOCKER_IMAGE="monitoring-build"
 docker run --rm \
   -v "${PROJECT_ROOT}:/build" \
   -w /build \
+  -e USER="${USER:-$(id -un 2>/dev/null || echo unknown)}" \
   "${DOCKER_IMAGE}" \
   bash -c "
     set -euo pipefail
