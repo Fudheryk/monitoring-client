@@ -34,11 +34,36 @@ cd "${PROJECT_ROOT}"
 # ---------------------------------------------------------------------------
 # Vérifications préalables
 # ---------------------------------------------------------------------------
+
+# Vérifier les permissions (évite les PermissionError)
+echo "🔍 Vérification des permissions..."
+if [[ -x "${PROJECT_ROOT}/scripts/check-perms.sh" ]]; then
+  "${PROJECT_ROOT}/scripts/check-perms.sh" || {
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "❌ Problèmes de permissions détectés"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Lancez la réparation automatique :"
+    echo "  ./scripts/check-perms.sh --fix"
+    echo ""
+    echo "Puis relancez la release :"
+    echo "  ./scripts/release.sh ${VERSION} \"${RELEASE_NOTES}\""
+    echo ""
+    exit 1
+  }
+  echo "✅ Permissions OK"
+else
+  echo "⚠️  check-perms.sh non trouvé, passage à la suite..."
+fi
+
+# Vérifier gh CLI
 if ! command -v gh >/dev/null 2>&1; then
   echo "❌ gh CLI non installé"
   exit 1
 fi
 
+# Vérifier que le dépôt est propre
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "❌ Le dépôt git n'est pas propre"
   git status --short

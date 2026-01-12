@@ -13,8 +13,13 @@ set -euo pipefail
 #
 # Correctifs appliqués ici :
 # 1) Nettoyage agressif des artefacts (dist/, build/, .build-pyinstaller/) AVANT build
-# 2) Sanity check BLOQUANT : le binaire généré doit annoncer la même version que VERSION
+# 2) Build PyInstaller dans /tmp/dist (isolé, évite pollution du repo)
+# 3) Sanity check BLOQUANT : le binaire généré doit annoncer la même version que VERSION
 #    -> si mismatch, on FAIL le build (plus de RPM incohérent).
+#
+# IMPORTANT (Docker) :
+# - Si lancé dans Docker, DISTPATH=/tmp/dist garantit que dist/ du repo reste propre
+# - Le binaire temporaire est copié vers SOURCES/ (source of truth pour rpmbuild)
 # -----------------------------------------------------------------------------
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,6 +27,14 @@ DIST_DIR="${PROJECT_ROOT}/dist"
 RELEASE_DIR="${PROJECT_ROOT}/release"
 LOG_FILE="${PROJECT_ROOT}/build-rpm.log"
 BINARY_NAME="monitoring-client"
+
+# Pour Docker : build PyInstaller dans /tmp (évite pollution du repo)
+IS_DOCKER="${IS_DOCKER:-false}"
+if [[ "${IS_DOCKER}" == "true" ]]; then
+  TEMP_DIST_DIR="/tmp/dist"
+else
+  TEMP_DIST_DIR="${DIST_DIR}"
+fi
 
 # Source des fonctions communes
 # - get_version
@@ -66,6 +79,8 @@ RPMROOT="${PROJECT_ROOT}/rpmbuild"
 log_info "Project root : ${PROJECT_ROOT}"
 log_info "Version      : ${VERSION}"
 log_info "RPMROOT      : ${RPMROOT}"
+log_info "Docker mode  : ${IS_DOCKER}"
+log_info "Temp dist    : ${TEMP_DIST_DIR}"
 log_info "Log          : ${LOG_FILE}"
 
 # -----------------------------------------------------------------------------
@@ -84,13 +99,14 @@ log_info "Préparation build PyInstaller (anti stale)..."
 
 # IMPORTANT :
 # En Docker (volume monté), dist/ peut contenir un vieux binaire.
-# Même si build.sh fait déjà du cleanup, on sécurise ici : on repart propre.
-rm -rf "${DIST_DIR}" \
+# On nettoie TEMP_DIST_DIR pour repartir propre.
+log_info "Nettoyage du répertoire de build temporaire..."
+rm -rf "${TEMP_DIST_DIR}" \
        "${PROJECT_ROOT}/build" \
        "${PROJECT_ROOT}/.build-pyinstaller" \
        2>/dev/null || true
-mkdir -p "${DIST_DIR}"
-log_success "Nettoyage dist/build terminé"
+mkdir -p "${TEMP_DIST_DIR}"
+log_success "Nettoyage terminé"
 
 log_info "Build du binaire PyInstaller..."
 if [[ ! -x "${PROJECT_ROOT}/scripts/build.sh" ]]; then
@@ -98,26 +114,27 @@ if [[ ! -x "${PROJECT_ROOT}/scripts/build.sh" ]]; then
   exit 1
 fi
 
-"${PROJECT_ROOT}/scripts/build.sh" || {
+# Build avec DISTPATH custom (évite pollution du repo en Docker)
+DISTPATH="${TEMP_DIST_DIR}" "${PROJECT_ROOT}/scripts/build.sh" || {
   log_error "Échec du build PyInstaller"
   exit 1
 }
 
 # Vérification du binaire généré
-if [[ ! -f "${DIST_DIR}/${BINARY_NAME}" ]]; then
-  log_error "Le binaire ${BINARY_NAME} n'a pas été généré dans ${DIST_DIR}/"
+if [[ ! -f "${TEMP_DIST_DIR}/${BINARY_NAME}" ]]; then
+  log_error "Le binaire ${BINARY_NAME} n'a pas été généré dans ${TEMP_DIST_DIR}/"
   exit 1
 fi
-log_success "Binaire ${BINARY_NAME} généré dans ${DIST_DIR}/"
+log_success "Binaire ${BINARY_NAME} généré dans ${TEMP_DIST_DIR}/"
 
 # -----------------------------------------------------------------------------
 # Sanity check BLOQUANT : version binaire == version package
 # -----------------------------------------------------------------------------
 log_info "Sanity check : vérification de la version du binaire..."
-BIN_VER="$("${DIST_DIR}/${BINARY_NAME}" --version 2>/dev/null | awk '{print $2}' || true)"
+BIN_VER="$("${TEMP_DIST_DIR}/${BINARY_NAME}" --version 2>/dev/null | awk '{print $2}' || true)"
 
 if [[ -z "${BIN_VER}" ]]; then
-  log_error "Impossible de lire la version via : ${DIST_DIR}/${BINARY_NAME} --version"
+  log_error "Impossible de lire la version via : ${TEMP_DIST_DIR}/${BINARY_NAME} --version"
   log_error "Assurez-vous que --version est supporté et retourne: 'monitoring-client X.Y.Z'"
   exit 1
 fi
@@ -135,7 +152,7 @@ log_success "Version binaire OK : ${BIN_VER}"
 # -----------------------------------------------------------------------------
 log_info "Création de l'archive Source0..."
 tar czf "${RPMROOT}/SOURCES/monitoring-client-${VERSION}.tar.gz" \
-  -C "${DIST_DIR}" "${BINARY_NAME}" || {
+  -C "${TEMP_DIST_DIR}" "${BINARY_NAME}" || {
   log_error "Échec de la création de l'archive Source0"
   exit 1
 }
@@ -172,7 +189,7 @@ CHANGELOG_DATE="$(LC_TIME=C date '+%a %b %d %Y')"
 
 # Remplacer les placeholders dans le template SPEC
 sed -e "s|__VERSION__|${VERSION}|g" \
-    -e "s|__DIST_DIR__|${DIST_DIR}|g" \
+    -e "s|__DIST_DIR__|${TEMP_DIST_DIR}|g" \
     -e "s|__PROJECT_ROOT__|${PROJECT_ROOT}|g" \
     -e "s|__CHANGELOG_DATE__|${CHANGELOG_DATE}|g" \
     "${PROJECT_ROOT}/packaging/templates/rpm/spec.template" \
@@ -199,6 +216,14 @@ if [[ ! -f "${RPM_OUTPUT}" ]]; then
   log_error "Le package RPM n'a pas été créé correctement"
   log_error "Attendu : ${RPM_OUTPUT}"
   exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# Nettoyage du binaire temporaire (Docker uniquement)
+# -----------------------------------------------------------------------------
+if [[ "${IS_DOCKER}" == "true" ]]; then
+  log_info "Nettoyage du binaire temporaire Docker..."
+  rm -rf "${TEMP_DIST_DIR}" 2>/dev/null || true
 fi
 
 # -----------------------------------------------------------------------------

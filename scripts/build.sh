@@ -9,25 +9,28 @@ set -euo pipefail
 # - Nettoyer les anciens artefacts pour éviter les versions stale
 # - Éviter que PyInstaller embarque une ancienne lib installée dans le venv
 #
-# Garanties (anti “mot de passe sudo”) :
+# Garanties (anti "mot de passe sudo") :
 # - AUCUN sudo dans ce script.
 # - Le workdir PyInstaller est placé dans /tmp (toujours writable) :
 #     ${TMPDIR:-/tmp}/monitoring-client-pyinstaller-${RUN_USER}
 #   => évite définitivement les PermissionError liés à un ancien build lancé en root
 #      (fichiers root dans le repo).
 #
-# Remarques :
-# - Ce script NE DOIT PAS “skip” en fonction de dist/ existant.
-# - Il est safe pour Docker/CI (nettoyage + --clean PyInstaller).
+# Nouveauté : support de DISTPATH custom (Docker/isolation)
+# - Par défaut : ./dist (comportement classique)
+# - Avec DISTPATH=/tmp/dist : le binaire final est écrit hors du repo
+#   => évite les conflits de permission entre Docker et hôte
 # -----------------------------------------------------------------------------
-
 
 # USER n'est pas toujours défini (ex: docker + set -u). On calcule un identifiant sûr.
 RUN_USER="${USER:-$(id -un 2>/dev/null || echo unknown)}"
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DIST_DIR="${PROJECT_ROOT}/dist"
+DEFAULT_DIST_DIR="${PROJECT_ROOT}/dist"
 SRC_DIR="${PROJECT_ROOT}/src"
+
+# Support DISTPATH custom (pour Docker / builds isolés)
+DIST_DIR="${DISTPATH:-${DEFAULT_DIST_DIR}}"
 
 # Répertoire de travail PyInstaller (isolé et TOUJOURS writable)
 # IMPORTANT :
@@ -81,21 +84,68 @@ echo "[build] Nettoyage du workdir PyInstaller..."
 rm -rf "${PYI_BUILD_DIR}" 2>/dev/null || true
 
 # 1c) Nettoyage binaire(s) dist précédents (anti-stale)
+# CRITIQUE : vérifier les permissions du DIST_DIR et du binaire
 echo "[build] Suppression des binaires dist précédents..."
-rm -f "${DIST_DIR}/${BINARY_NAME}" "${DIST_DIR}/${BINARY_NAME}.exe" 2>/dev/null || true
+
+# Vérifier si le répertoire dist existe et s'il est writable
+if [[ -d "${DIST_DIR}" ]] && [[ ! -w "${DIST_DIR}" ]]; then
+  echo "[build] ⚠️  ERREUR CRITIQUE : Le répertoire ${DIST_DIR}/ n'est PAS writable"
+  echo "[build]    Propriétaire : $(stat -c '%U:%G' "${DIST_DIR}" 2>/dev/null || echo 'inconnu')"
+  echo "[build]    Permissions  : $(stat -c '%A' "${DIST_DIR}" 2>/dev/null || echo 'inconnu')"
+  echo "[build]"
+  echo "[build] Cause probable : build Docker précédent a créé ce répertoire en root."
+  echo "[build]"
+  echo "[build] 🔧 Solution :"
+  echo "[build]    sudo chown -R \$(whoami):\$(whoami) ${DIST_DIR}/"
+  echo "[build]"
+  echo "[build] ⚠️  Pour éviter ce problème à l'avenir :"
+  echo "[build]    - Utilisez ./scripts/docker-build-rpm.sh au lieu de docker run direct"
+  echo "[build]    - Ce script garantit l'UID/GID correct (-u \$(id -u):\$(id -g))"
+  exit 1
+fi
+
+# Vérifier si le binaire existe et s'il est writable
+if [[ -f "${DIST_DIR}/${BINARY_NAME}" ]]; then
+  if [[ ! -w "${DIST_DIR}/${BINARY_NAME}" ]]; then
+    echo "[build] ⚠️  ERREUR CRITIQUE : ${DIST_DIR}/${BINARY_NAME} existe et n'est PAS writable"
+    echo "[build]    Propriétaire : $(stat -c '%U:%G' "${DIST_DIR}/${BINARY_NAME}" 2>/dev/null || echo 'inconnu')"
+    echo "[build]    Permissions  : $(stat -c '%A' "${DIST_DIR}/${BINARY_NAME}" 2>/dev/null || echo 'inconnu')"
+    echo "[build]"
+    echo "[build] 🔧 Solution :"
+    echo "[build]    sudo chown -R \$(whoami):\$(whoami) ${DIST_DIR}/"
+    echo "[build]"
+    exit 1
+  fi
+  rm -f "${DIST_DIR}/${BINARY_NAME}" || {
+    echo "[build] ❌ Impossible de supprimer ${DIST_DIR}/${BINARY_NAME}"
+    exit 1
+  }
+fi
+
+rm -f "${DIST_DIR}/${BINARY_NAME}.exe" 2>/dev/null || true
 
 # 1d) Nettoyage cache PyInstaller utilisateur
 # -> C'est dans $HOME, donc aucun sudo. Si ça échoue, on logge et on continue.
+echo "[build] Nettoyage du cache PyInstaller..."
 if [[ -d "${HOME}/.cache/pyinstaller" ]]; then
-  echo "[build] Nettoyage du cache PyInstaller utilisateur..."
   rm -rf "${HOME}/.cache/pyinstaller" 2>/dev/null || {
     echo "[build] ⚠️ Impossible de supprimer ${HOME}/.cache/pyinstaller (on continue)."
   }
 fi
 
+# 1e) Nettoyage des fichiers Python compilés (*.pyc, __pycache__)
+# -> Évite les problèmes de cache de modules Python
+echo "[build] Nettoyage des fichiers Python compilés..."
+find "${SRC_DIR}" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find "${SRC_DIR}" -type f -name "*.pyc" -delete 2>/dev/null || true
+find "${PROJECT_ROOT}" -maxdepth 1 -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+
 # 1e) Créer le répertoire de sortie si nécessaire
 mkdir -p "${DIST_DIR}"
 cd "${PROJECT_ROOT}"
+
+# 1f) Afficher la version détectée dans le code source (debug)
+echo "[build] Version dans __version__.py : $(grep '__version__ = ' "${SRC_DIR}/monitoring_client/__version__.py" 2>/dev/null | cut -d'"' -f2 || echo 'introuvable')"
 
 # -----------------------------------------------------------------------------
 # 2) Build PyInstaller
@@ -105,6 +155,7 @@ pyinstaller \
   --clean \
   --noconfirm \
   --workpath "${PYI_BUILD_DIR}" \
+  --distpath "${DIST_DIR}" \
   "${SPEC_FILE}"
 
 # -----------------------------------------------------------------------------
