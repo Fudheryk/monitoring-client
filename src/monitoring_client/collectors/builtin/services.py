@@ -4,9 +4,12 @@ import subprocess
 
 from monitoring_client.collectors.base_collector import BaseCollector
 
-# Configuration du logger
+# -----------------------------------------------------------------------------
+# Logger
+# -----------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)  # DEBUG pour voir en détail ce qui est collecté / filtré
+# Laisse DEBUG ici si tu veux diagnostiquer (sinon INFO en prod)
+logger.setLevel(logging.DEBUG)
 
 
 class ServicesCollector(BaseCollector):
@@ -18,26 +21,41 @@ class ServicesCollector(BaseCollector):
     Spécificité demandée :
     - Ne remonter QUE tty1 pour les getty (donc ignorer tty2..tty6..ttyN).
     - Si tty1 n'existe pas, ne remonter AUCUN tty (pas de getty@ttyX).
+
+    Important (fix Debian) :
+    - Le caractère "●" dans `systemctl list-units` n'est PAS un indicateur fiable de "not-found".
+      C'est juste un marqueur d'unités "problématiques" selon la sortie.
+    - Le vrai indicateur "not-found" est dans la colonne LOAD (2e colonne).
+      Donc on ne renomme JAMAIS un service en "_unknown_service".
+      On ignore simplement les unités dont LOAD == "not-found".
     """
 
-    name = "services"     # Identifiant du collecteur
-    editor = "builtin"    # Type de collecteur
+    name = "services"
+    editor = "builtin"
 
+    # Remplace tout caractère non autorisé par "_" pour avoir des noms de métriques stables
     _metric_name_safe_re = re.compile(r"[^a-zA-Z0-9._-]")
 
-    # Regex: extrait le nom du service depuis une ligne systemctl list-units
-    # Exemple de ligne typique:
-    # getty@tty1.service loaded active running Getty on tty1
+    # Extrait le nom d'un service depuis une ligne de `systemctl list-units`.
+    # Exemple de ligne possible (selon distro):
+    #   getty@tty1.service loaded active running Getty on tty1
+    #   ● syslog.service not-found inactive dead syslog.service
+    #
+    # On accepte un éventuel "●" (avec espaces) puis on capture <xxx.service>
     _service_name_regex = re.compile(r"^(?:●?\s*)(\S+\.service)\s+.*$")
 
-    # Regex: identifie les getty tty (tty1, tty2, ..., tty63...)
+    # Identifie les getty tty (tty1, tty2, ..., tty63...)
     _getty_tty_regex = re.compile(r"^getty@tty\d+\.service$")
 
     def _collect_metrics(self):
         metrics = []
 
-        # 1) On récupère la liste des unités systemd de type service
+        # ---------------------------------------------------------------------
+        # 1) Récupération des services via systemctl
+        # ---------------------------------------------------------------------
         try:
+            # --plain : évite certains glyphes/formatages suivant la distro
+            # (réduit les surprises de parsing, tout en gardant une sortie textuelle simple)
             result = subprocess.run(
                 [
                     "systemctl",
@@ -46,6 +64,7 @@ class ServicesCollector(BaseCollector):
                     "--type=service",
                     "--no-legend",
                     "--no-pager",
+                    "--plain",
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -53,7 +72,6 @@ class ServicesCollector(BaseCollector):
                 check=False,
             )
         except FileNotFoundError:
-            # systemd absent / systemctl non présent
             logger.error("systemctl non trouvé, impossible de collecter les services.")
             return metrics
         except Exception as exc:
@@ -65,9 +83,11 @@ class ServicesCollector(BaseCollector):
         active_count = 0
         failed_count = 0
 
-        # 2) Détection préalable : est-ce que getty@tty1.service existe ?
-        #    - S'il existe => on ne garde QUE celui-ci pour les TTY.
-        #    - S'il n'existe pas => on ne garde AUCUN getty@ttyX.
+        # ---------------------------------------------------------------------
+        # 2) Détection préalable : getty@tty1 existe ?
+        #    - Si oui => on garde uniquement getty@tty1.service
+        #    - Si non => on ne remonte aucun getty@ttyX
+        # ---------------------------------------------------------------------
         tty1_present = False
         for line in lines:
             match = self._service_name_regex.match(line)
@@ -92,15 +112,18 @@ class ServicesCollector(BaseCollector):
             if not self._getty_tty_regex.match(service_name):
                 return True
 
-            # service getty@ttyX
             if tty1_present:
                 return service_name == "getty@tty1.service"
             return False
 
+        # ---------------------------------------------------------------------
         # 3) Parcours des services et construction des métriques
+        # ---------------------------------------------------------------------
         for line in lines:
             match = self._service_name_regex.match(line)
             if not match:
+                # On log en debug plutôt qu'en warning si tu veux réduire le bruit,
+                # mais je conserve ton warning d'origine.
                 logger.warning(f"Nom de service invalide dans la ligne: {line}. Ignoré.")
                 continue
 
@@ -110,24 +133,23 @@ class ServicesCollector(BaseCollector):
             # UNIT LOAD ACTIVE SUB DESCRIPTION...
             parts = line.split()
             if len(parts) < 4:
+                logger.debug(f"Ligne systemctl trop courte (ignorée): {line}")
                 continue
 
+            # Très important : LOAD est la 2e colonne (parts[1])
+            # C'est ici qu'on trouve "loaded" / "not-found" / etc.
+            load_state = parts[1]
             active_state = parts[2]  # active/inactive/failed/...
             sub_state = parts[3]     # running/dead/exited/...
 
-            # Gestion "not-found" (systemctl peut mettre une puce '●' en début de ligne)
-            # Ton code original traitait ça en remplaçant par un service générique.
-            # On garde la même logique, mais on applique ensuite le filtre.
-            if line.startswith("●"):
-                logger.warning(f"Ligne indique un service non trouvé: {line}")
-                service_name = "_unknown_service"
-                active_state = "inactive"
-                sub_state = "dead"
+            # Fix Debian : ignorer les unités fantômes / paquets absents / alias
+            # (ne surtout PAS renommer en _unknown_service, sinon on crée des doublons)
+            if load_state == "not-found":
+                logger.debug(f"Service not-found ignoré: {service_name} ({line})")
+                continue
 
-            # Filtre des services transitoires / dynamiques "run-*"
-            # (souvent créés à la volée pour exécuter une tâche puis disparaître).
-            # Exemple vu chez toi: run-plesk-deferred-aca-1768583362.service
-            # On les ignore pour éviter le bruit (noms qui changent, NO DATA, etc.).
+            # Filtre des services transitoires "run-*"
+            # Ces unités ont des noms changeants et génèrent du bruit dans la supervision.
             if service_name.startswith("run-") and service_name.endswith(".service"):
                 logger.debug(f"Service transitoire ignoré (run-*): {service_name}")
                 continue
@@ -151,10 +173,11 @@ class ServicesCollector(BaseCollector):
 
             logger.debug(
                 f"Service retenu: {service_name} -> metric={safe_service_name} "
-                f"(active_state={active_state}, sub_state={sub_state}, is_active={is_active})"
+                f"(load_state={load_state}, active_state={active_state}, sub_state={sub_state}, "
+                f"is_active={is_active}, is_failed={is_failed})"
             )
 
-            # Ajout de la métrique par service
+            # Ajout de la métrique par service (booléen)
             metrics.append(
                 {
                     "name": safe_service_name,
@@ -165,7 +188,9 @@ class ServicesCollector(BaseCollector):
                 }
             )
 
+        # ---------------------------------------------------------------------
         # 4) Ajout des métriques globales
+        # ---------------------------------------------------------------------
         metrics.append(
             {
                 "name": "services.active_count",

@@ -172,7 +172,7 @@ Description: Agent de monitoring système léger et sécurisé
  Fonctionnalités principales :
   - 11 collecteurs builtin (CPU, RAM, disque, réseau, services, etc.)
   - Support des métriques custom via vendors (bash, python, etc.)
-  - Timer systemd (exécution toutes les 30 secondes)
+  - Timer systemd (exécution toutes les 60 secondes)
   - Validation complète du payload avant envoi
   - Binaire standalone (aucune dépendance Python runtime)
   - Sécurisation renforcée (ProtectSystem, NoNewPrivileges)

@@ -12,7 +12,7 @@ packaging/
 ├── systemd/
 │   ├── monitoring-client.service.legacy   # Pour systemd < 231 (CentOS 7)
 │   ├── monitoring-client.service.modern   # Pour systemd >= 231 (Debian/Ubuntu)
-│   └── monitoring-client.timer            # Timer commun (30s)
+│   └── monitoring-client.timer            # Timer commun (60s)
 └── templates/
     ├── deb/
     │   ├── conffiles             # Fichiers protégés lors upgrade

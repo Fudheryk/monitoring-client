@@ -90,7 +90,7 @@ Description=Planification périodique du Monitoring Client
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=5min
+OnUnitActiveSec=60s
 Unit=monitoring-client.service
 
 [Install]

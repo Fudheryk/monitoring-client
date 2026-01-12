@@ -1,10 +1,10 @@
 [Unit]
-Description=Run Monitoring Client Agent every 30 seconds
+Description=Run Monitoring Client Agent every 60 seconds
 Requires=monitoring-client.service
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=30s
+OnUnitActiveSec=60s
 Unit=monitoring-client.service
 Persistent=true
 
