@@ -12,7 +12,7 @@ set -euo pipefail
 # Garanties (anti “mot de passe sudo”) :
 # - AUCUN sudo dans ce script.
 # - Le workdir PyInstaller est placé dans /tmp (toujours writable) :
-#     ${TMPDIR:-/tmp}/monitoring-client-pyinstaller-${USER}
+#     ${TMPDIR:-/tmp}/monitoring-client-pyinstaller-${RUN_USER}
 #   => évite définitivement les PermissionError liés à un ancien build lancé en root
 #      (fichiers root dans le repo).
 #
@@ -24,6 +24,7 @@ set -euo pipefail
 
 # USER n'est pas toujours défini (ex: docker + set -u). On calcule un identifiant sûr.
 RUN_USER="${USER:-$(id -un 2>/dev/null || echo unknown)}"
+
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${PROJECT_ROOT}/dist"
 SRC_DIR="${PROJECT_ROOT}/src"
