@@ -106,3 +106,11 @@ release/
 data/api_key
 data/fingerprint
 *.SHA256SUMS.txt
+
+# Local overrides (never commit)
+config/config.yaml
+
+# Local / generated config artifacts
+config/*.local.yaml
+config/*.tmp
+config/*.bak
