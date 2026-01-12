@@ -7,7 +7,14 @@ set -euo pipefail
 # Produit :
 #   rpmbuild/RPMS/x86_64/monitoring-client-<version>-1.x86_64.rpm
 #
-# Utilise les fichiers communs de packaging/ pour éviter la duplication
+# Points critiques (bug rencontré) :
+# - Le RPM "1.0.52" a embarqué un binaire "1.0.50" car dist/ contenait un artefact
+#   stale (volume Docker, cache CI, etc.).
+#
+# Correctifs appliqués ici :
+# 1) Nettoyage agressif des artefacts (dist/, build/, .build-pyinstaller/) AVANT build
+# 2) Sanity check BLOQUANT : le binaire généré doit annoncer la même version que VERSION
+#    -> si mismatch, on FAIL le build (plus de RPM incohérent).
 # -----------------------------------------------------------------------------
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -17,16 +24,21 @@ LOG_FILE="${PROJECT_ROOT}/build-rpm.log"
 BINARY_NAME="monitoring-client"
 
 # Source des fonctions communes
+# - get_version
+# - check_common_prerequisites
+# - log_info/log_success/log_error
 source "${PROJECT_ROOT}/packaging/common/functions.sh"
 
-# Initialisation du logging
+# -----------------------------------------------------------------------------
+# Logging : tout vers un fichier + stdout (utile en CI/Docker)
+# -----------------------------------------------------------------------------
 exec > >(tee -a "${LOG_FILE}") 2>&1
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Démarrage du build RPM"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # -----------------------------------------------------------------------------
-# Vérification des prérequis
+# Vérification des prérequis communs
 # -----------------------------------------------------------------------------
 check_common_prerequisites
 
@@ -36,7 +48,6 @@ if ! command -v rpmbuild &> /dev/null; then
   log_error "Installez-le avec : sudo yum install rpm-build"
   exit 1
 fi
-
 log_success "rpmbuild détecté"
 
 # Vérifier tar
@@ -44,13 +55,12 @@ if ! command -v tar &> /dev/null; then
   log_error "tar n'est pas installé."
   exit 1
 fi
-
 log_success "tar détecté"
 
 # -----------------------------------------------------------------------------
 # Configuration du package
 # -----------------------------------------------------------------------------
-VERSION=$(get_version "${PROJECT_ROOT}")
+VERSION="$(get_version "${PROJECT_ROOT}")"
 RPMROOT="${PROJECT_ROOT}/rpmbuild"
 
 log_info "Project root : ${PROJECT_ROOT}"
@@ -61,16 +71,27 @@ log_info "Log          : ${LOG_FILE}"
 # -----------------------------------------------------------------------------
 # Préparation de l'arborescence rpmbuild
 # -----------------------------------------------------------------------------
-log_info "Nettoyage de l'ancienne structure..."
+log_info "Nettoyage de l'ancienne structure rpmbuild..."
 rm -rf "${RPMROOT}"
 mkdir -p "${RPMROOT}"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 mkdir -p "${RELEASE_DIR}"
-
 log_success "Structure rpmbuild créée"
 
 # -----------------------------------------------------------------------------
-# Build du binaire PyInstaller
+# Build du binaire PyInstaller (source of truth du RPM)
 # -----------------------------------------------------------------------------
+log_info "Préparation build PyInstaller (anti stale)..."
+
+# IMPORTANT :
+# En Docker (volume monté), dist/ peut contenir un vieux binaire.
+# Même si build.sh fait déjà du cleanup, on sécurise ici : on repart propre.
+rm -rf "${DIST_DIR}" \
+       "${PROJECT_ROOT}/build" \
+       "${PROJECT_ROOT}/.build-pyinstaller" \
+       2>/dev/null || true
+mkdir -p "${DIST_DIR}"
+log_success "Nettoyage dist/build terminé"
+
 log_info "Build du binaire PyInstaller..."
 if [[ ! -x "${PROJECT_ROOT}/scripts/build.sh" ]]; then
   log_error "Le script build.sh n'existe pas ou n'est pas exécutable."
@@ -87,8 +108,27 @@ if [[ ! -f "${DIST_DIR}/${BINARY_NAME}" ]]; then
   log_error "Le binaire ${BINARY_NAME} n'a pas été généré dans ${DIST_DIR}/"
   exit 1
 fi
+log_success "Binaire ${BINARY_NAME} généré dans ${DIST_DIR}/"
 
-log_success "Binaire ${BINARY_NAME} généré"
+# -----------------------------------------------------------------------------
+# Sanity check BLOQUANT : version binaire == version package
+# -----------------------------------------------------------------------------
+log_info "Sanity check : vérification de la version du binaire..."
+BIN_VER="$("${DIST_DIR}/${BINARY_NAME}" --version 2>/dev/null | awk '{print $2}' || true)"
+
+if [[ -z "${BIN_VER}" ]]; then
+  log_error "Impossible de lire la version via : ${DIST_DIR}/${BINARY_NAME} --version"
+  log_error "Assurez-vous que --version est supporté et retourne: 'monitoring-client X.Y.Z'"
+  exit 1
+fi
+
+if [[ "${BIN_VER}" != "${VERSION}" ]]; then
+  log_error "Mismatch version binaire : attendu=${VERSION} obtenu=${BIN_VER}"
+  log_error "Refus de créer un RPM incohérent (binaire stale ou build incorrect)."
+  exit 1
+fi
+
+log_success "Version binaire OK : ${BIN_VER}"
 
 # -----------------------------------------------------------------------------
 # Création d'une archive Source0 minimale pour rpmbuild
@@ -99,7 +139,6 @@ tar czf "${RPMROOT}/SOURCES/monitoring-client-${VERSION}.tar.gz" \
   log_error "Échec de la création de l'archive Source0"
   exit 1
 }
-
 log_success "Archive Source0 créée"
 
 # -----------------------------------------------------------------------------
@@ -128,10 +167,10 @@ log_success "Fichiers de configuration vérifiés"
 # -----------------------------------------------------------------------------
 log_info "Génération du fichier SPEC..."
 
-# Générer la date en anglais pour le changelog
-CHANGELOG_DATE=$(LC_TIME=C date '+%a %b %d %Y')
+# Date en anglais pour le changelog RPM
+CHANGELOG_DATE="$(LC_TIME=C date '+%a %b %d %Y')"
 
-# Remplacer les placeholders dans le template
+# Remplacer les placeholders dans le template SPEC
 sed -e "s|__VERSION__|${VERSION}|g" \
     -e "s|__DIST_DIR__|${DIST_DIR}|g" \
     -e "s|__PROJECT_ROOT__|${PROJECT_ROOT}|g" \
@@ -139,7 +178,7 @@ sed -e "s|__VERSION__|${VERSION}|g" \
     "${PROJECT_ROOT}/packaging/templates/rpm/spec.template" \
     > "${RPMROOT}/SPECS/monitoring-client.spec"
 
-log_success "Fichier SPEC généré"
+log_success "Fichier SPEC généré : ${RPMROOT}/SPECS/monitoring-client.spec"
 
 # -----------------------------------------------------------------------------
 # Lancement de rpmbuild
