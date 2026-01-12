@@ -114,3 +114,4 @@ config/config.yaml
 config/*.local.yaml
 config/*.tmp
 config/*.bak
+config/config.defaults.yaml
